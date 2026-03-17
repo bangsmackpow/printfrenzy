@@ -1,5 +1,5 @@
-import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+import NextAuth from "@auth/nextjs";
+import Credentials from "@auth/nextjs/providers/credentials";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [

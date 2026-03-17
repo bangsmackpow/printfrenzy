@@ -1,7 +1,7 @@
 "use client";
 import './globals.css';
 import Link from 'next/link';
-import { signOut } from "next-auth/react";
+import { signOut } from "@auth/nextjs/react"; // or signIn
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
