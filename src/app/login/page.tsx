@@ -1,5 +1,5 @@
 "use client";
-import { signIn } from "@/auth"; // Changed from @auth/nextjs/react
+import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 

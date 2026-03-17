@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from "@/auth";
 
 export const runtime = 'edge';
 
@@ -9,11 +10,15 @@ export async function POST(
 ) {
   // Await the params before using them
   const { id } = await params; 
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   
   const { status } = await req.json();
-  const db = (process.env as any).DB;
+  const db = (process.env as unknown as { DB: any }).DB;
   
-  const userEmail = "printer_operator@builtnetworks.com"; 
+  const userEmail = session.user?.email || "unknown"; 
 
   try {
     await db.batch([
@@ -23,7 +28,8 @@ export async function POST(
     ]);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

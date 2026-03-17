@@ -1,52 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { parse } from 'csv-parse/sync';
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session || (session.user as any)?.role !== 'ADMIN') {
+  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const formData = await req.formData();
-  const file = formData.get('file') as File;
-  const text = await file.text();
-  
-  // Simple CSV parser for Wix format
-  const lines = text.split('\n');
-  const headers = lines[0].split(',');
-  const db = (process.env as any).DB;
+  try {
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    if (!file) {
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    }
 
-  let importCount = 0;
+    const text = await file.text();
+    if (!text.includes(',')) {
+      return NextResponse.json({ error: "Invalid CSV format" }, { status: 400 });
+    }
 
-  for (let i = 1; i < lines.length; i++) {
-    const row = lines[i].split(',');
-    if (row.length < headers.length) continue;
+    const db = (process.env as unknown as { DB: { prepare: (s: string) => any } }).DB;
 
-    // Mapping Wix Columns (Adjust indices if your Wix export differs)
-    const orderNumber = row[0]; // "Order ID"
-    const customerName = row[17]; // "Billing Name"
-    const productName = row[36]; // "Lineitem name"
-    const variant = row[38]; // "Lineitem options"
-    const imageUrl = row[42]; // "Lineitem image URL"
+    // Wix CSVs often have a preamble or specific header row. 
+    // We'll use csv-parse with 'columns: true' to map by name.
+    const records = parse(text, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true
+    });
 
-    if (!imageUrl) continue;
+    if (records.length === 0) {
+      return NextResponse.json({ error: "No records found in CSV" }, { status: 400 });
+    }
 
-    await db.prepare(`
-      INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'ORDERED')
-    `).bind(
-      crypto.randomUUID(),
-      orderNumber,
-      customerName,
-      productName,
-      variant,
-      imageUrl
-    ).run();
+    let importCount = 0;
+    let skipCount = 0;
 
-    importCount++;
+    for (const record of records as Array<Record<string, string>>) {
+      // Mapping Wix Columns (Using common Wix export headers)
+      const orderNumber = record['Order ID'] || record['order_number'];
+      const customerName = record['Billing Name'] || record['customer_name'] || 'Unknown Customer';
+      const productName = record['Lineitem name'] || record['product_name'] || 'Unknown Product';
+      const variant = (record['Lineitem options'] || record['variant'] || '').trim();
+      const imageUrl = record['Lineitem image URL'] || record['image_url'];
+
+      if (!imageUrl || !orderNumber) {
+        skipCount++;
+        continue;
+      }
+
+      await db.prepare(`
+        INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'ORDERED')
+      `).bind(
+        crypto.randomUUID(),
+        orderNumber,
+        customerName,
+        productName,
+        variant,
+        imageUrl
+      ).run();
+
+      importCount++;
+    }
+
+    return NextResponse.json({ success: true, count: importCount, skipped: skipCount });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("Import error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true, count: importCount });
 }

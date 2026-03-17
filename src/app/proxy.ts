@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 export const runtime = 'edge';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // We'll skip the complex auth check here for a moment 
   // just to see if the site boots up.
   return NextResponse.next();
