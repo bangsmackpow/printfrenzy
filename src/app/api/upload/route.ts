@@ -1,31 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { r2 } from "@/utils/r2Client";
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
-  const { fileName, fileType } = await req.json();
-  
-  // Cloudflare R2 uses the S3 API
-  const S3 = new S3Client({
-    region: "auto",
-    endpoint: `https://${process.env.ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
+  const { contentType, fileName } = await req.json();
+  const key = `uploads/${Date.now()}-${fileName}`;
 
-  const key = `orders/${Date.now()}-${fileName}`;
   const command = new PutObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME,
     Key: key,
-    ContentType: fileType,
+    ContentType: contentType,
   });
 
-  const uploadUrl = await getSignedUrl(S3, command, { expiresIn: 3600 });
-  const publicUrl = `https://assets.printfrenzy.com/${key}`; // Your R2 Public Domain
+  const signedUrl = await getSignedUrl(r2, command, { expiresIn: 60 });
+  // This is the URL we will store in D1
+  const publicUrl = `https://assets.printfrenzy.com/${key}`; 
 
-  return NextResponse.json({ uploadUrl, publicUrl });
+  return NextResponse.json({ signedUrl, publicUrl });
 }
