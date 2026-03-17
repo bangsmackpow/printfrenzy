@@ -4,17 +4,18 @@ export const runtime = 'edge';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  // Params must be treated as a Promise in Next.js 15+
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  // Await the params before using them
+  const { id } = await params; 
+  
   const { status } = await req.json();
   const db = (process.env as any).DB;
   
-  // In Phase 2, we will get the real email from the Auth session
   const userEmail = "printer_operator@builtnetworks.com"; 
 
   try {
-    // We use a batch to ensure both the update and the log happen together
     await db.batch([
       db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id),
       db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")
