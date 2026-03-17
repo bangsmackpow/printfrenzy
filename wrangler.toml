@@ -1,0 +1,12 @@
+name = "printfrenzy"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = ".next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "printfrenzy_db"
+database_id = "be83f295-fb36-4dd0-b2fa-d25d03d6f342"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "printfrenzy"
