@@ -1,6 +1,9 @@
 import NextAuth from "@auth/nextjs";
 import Credentials from "@auth/nextjs/providers/credentials";
 
+// Note: We do NOT use 'import NextAuth from ...' as a default if it fails.
+// If the build still complains, use: import { NextAuth } from "@auth/nextjs";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
@@ -10,7 +13,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .bind(credentials?.email).first();
 
         if (user && user.password_hash === credentials?.password) {
-          return { id: user.id, email: user.email, role: user.role };
+          return { id: user.id, email: user.email, role: user.role as string };
         }
         return null;
       },

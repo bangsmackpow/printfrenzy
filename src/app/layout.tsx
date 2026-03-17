@@ -1,7 +1,7 @@
 "use client";
 import './globals.css';
 import Link from 'next/link';
-import { signIn, signOut, useSession } from "@auth/nextjs";
+import { signIn, signOut } from "@/auth";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Note: Wrap this in a <SessionProvider> in your actual file if using useSession
