@@ -6,8 +6,14 @@ export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: "Not Authenticated" }, { status: 401 });
+  }
+  
+  // For now, let Managers and Admins import
+  const role = (session.user as { role?: string })?.role;
+  if (role !== 'ADMIN' && role !== 'MANAGER') {
+    return NextResponse.json({ error: "Access Denied: Manager role required" }, { status: 403 });
   }
 
   try {
@@ -22,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid CSV format" }, { status: 400 });
     }
 
-    const db = (process.env as unknown as { DB: { prepare: (s: string) => any } }).DB;
+    const db = (process.env as unknown as { DB: { prepare: (s: string) => { bind: (...args: unknown[]) => { run: () => Promise<void> } } } }).DB;
 
     // Wix CSVs often have a preamble or specific header row. 
     // We'll use csv-parse with 'columns: true' to map by name.
@@ -68,10 +74,10 @@ export async function POST(req: NextRequest) {
       importCount++;
     }
 
-    return NextResponse.json({ success: true, count: importCount, skipped: skipCount });
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error("Import error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ count: importCount, skipped: skipCount });
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error("CSV Import Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

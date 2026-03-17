@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from "@/auth";
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
-  const data = await req.json();
-  const db = (process.env as any).DB;
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Not Authenticated" }, { status: 401 });
+  }
+  const data = await req.json() as { order_number: string; customer_name: string; product_name: string; variant: string; image_url: string };
+  const db = (process.env as unknown as { DB: { prepare: (s: string) => { bind: (...args: unknown[]) => { run: () => Promise<void> } } } }).DB;
   const orderId = crypto.randomUUID();
 
   try {
@@ -21,7 +26,8 @@ export async function POST(req: NextRequest) {
     ).run();
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
