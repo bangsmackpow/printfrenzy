@@ -1,4 +1,4 @@
-import NextAuth from "@auth/nextjs";
+import { NextAuth } from "@auth/nextjs"; // Braces added here
 import Credentials from "@auth/nextjs/providers/credentials";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -6,20 +6,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       async authorize(credentials) {
         const db = (process.env as any).DB;
-        
         if (!db) return null;
 
         const user = await db.prepare("SELECT * FROM users WHERE email = ?")
           .bind(credentials?.email)
           .first();
 
-        // Note: Replace with bcrypt.compare in production
         if (user && user.password_hash === credentials?.password) {
-          return { 
-            id: user.id, 
-            email: user.email, 
-            role: user.role 
-          };
+          return { id: user.id, email: user.email, role: user.role };
         }
         return null;
       },
@@ -35,9 +29,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  pages: {
-    signIn: "/login",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  trustHost: true
+  pages: { signIn: "/login" },
+  secret: process.env.AUTH_SECRET,
 });
