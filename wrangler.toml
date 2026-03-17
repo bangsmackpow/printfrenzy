@@ -12,3 +12,5 @@ database_id = "be83f295-fb36-4dd0-b2fa-d25d03d6f342"
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "printfrenzy"
+
+#this is to push a build 3/17/2026 delete if needed
