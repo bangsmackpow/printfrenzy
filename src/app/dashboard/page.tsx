@@ -3,8 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
-import { signOut } from "@auth/nextjs/react";
-
+import { signOut } from "@/auth";
 interface Order {
   id: string;
   order_number: string;

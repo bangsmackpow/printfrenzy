@@ -1,52 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parse } from 'csv-parse/sync'; // npm install csv-parse
+import { auth } from "@/auth";
 
-export const runtime = 'edge'; // Required for Cloudflare Workers/Pages
+export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
-  try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const userEmail = "admin@yourshop.com"; // Get this from your Auth session later
-
-    if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-
-    const csvText = await file.text();
-    const records = parse(csvText, {
-      columns: true,
-      skip_empty_lines: true,
-    });
-
-    // Access the Cloudflare D1 binding
-    const db = (process.env as any).DB; 
-
-    const insertPromises = records.map(async (row: any) => {
-      const orderId = crypto.randomUUID();
-      
-      // 1. Insert the Order
-      await db.prepare(`
-        INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'ORDERED')
-      `).bind(
-        orderId,
-        row['Order number'],
-        row['Customer name'],
-        row['Product name'],
-        row['Product variant'],
-        row['Product image'] // This is the raw Wix URL
-      ).run();
-
-      // 2. Log the Action (Tracking "Who does what")
-      await db.prepare(`
-        INSERT INTO audit_logs (order_id, user_email, action)
-        VALUES (?, ?, ?)
-      `).bind(orderId, userEmail, 'Imported via CSV').run();
-    });
-
-    await Promise.all(insertPromises);
-
-    return NextResponse.json({ success: true, count: records.length });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const session = await auth();
+  if (!session || (session.user as any)?.role !== 'ADMIN') {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
+
+  const formData = await req.formData();
+  const file = formData.get('file') as File;
+  const text = await file.text();
+  
+  // Simple CSV parser for Wix format
+  const lines = text.split('\n');
+  const headers = lines[0].split(',');
+  const db = (process.env as any).DB;
+
+  let importCount = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(',');
+    if (row.length < headers.length) continue;
+
+    // Mapping Wix Columns (Adjust indices if your Wix export differs)
+    const orderNumber = row[0]; // "Order ID"
+    const customerName = row[17]; // "Billing Name"
+    const productName = row[36]; // "Lineitem name"
+    const variant = row[38]; // "Lineitem options"
+    const imageUrl = row[42]; // "Lineitem image URL"
+
+    if (!imageUrl) continue;
+
+    await db.prepare(`
+      INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, status)
+      VALUES (?, ?, ?, ?, ?, ?, 'ORDERED')
+    `).bind(
+      crypto.randomUUID(),
+      orderNumber,
+      customerName,
+      productName,
+      variant,
+      imageUrl
+    ).run();
+
+    importCount++;
+  }
+
+  return NextResponse.json({ success: true, count: importCount });
 }
