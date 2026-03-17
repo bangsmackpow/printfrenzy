@@ -1,7 +1,7 @@
 "use client";
-import { signIn } from "@auth/nextjs/react"; // Updated import
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, signOut, useSession } from "@auth/nextjs";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
