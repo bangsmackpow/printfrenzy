@@ -43,18 +43,35 @@ export async function GET() {
   }
 
   try {
-    const pass = "admin123";
-    const hash = "$2a$10$7RQxLzIiVGXlel3Qn4tBBedvLk9PINr4sqljxq/IHpIrCRD2xS17i"; // The one we set
-    const start = Date.now();
-    const isMatch = await bcrypt.compare(pass, hash);
-    results.tests.bcrypt_compare = {
-      success: true,
-      match: isMatch,
-      duration: `${Date.now() - start}ms`
-    };
+    const db = (process.env as unknown as { DB: D1Database }).DB;
+    if (db) {
+      const email = "curtis@printfrenzy.dev";
+      const pass = "admin123";
+      
+      const userQueryResult = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
+        .bind(email)
+        .first();
+      
+      const user = userQueryResult as { email: string; password_hash: string } | null;
+      
+      if (user) {
+        const start = Date.now();
+        const isMatch = await bcrypt.compare(pass, user.password_hash);
+        results.tests.live_db_check = {
+          success: true,
+          email: user.email,
+          hash_len: user.password_hash.length,
+          hash_prefix: user.password_hash.substring(0, 10),
+          match: isMatch,
+          duration: `${Date.now() - start}ms`
+        };
+      } else {
+        results.tests.live_db_check = { success: false, error: "User curtis@printfrenzy.dev not found in DB" };
+      }
+    }
   } catch (e: unknown) {
     const err = e as Error;
-    results.tests.bcrypt_compare = { success: false, error: err.message };
+    results.tests.live_db_check = { success: false, error: err.message };
   }
 
   return NextResponse.json(results);

@@ -14,6 +14,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    console.log(`Login Attempt: Email=[${email}] (len: ${email.length}), Password Length=${password.length}`);
     try {
       const result = await signIn("credentials", {
         email,

@@ -32,20 +32,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
           console.log("DEBUG: DB BINDING FOUND");
 
+          const email = (credentials?.email as string || "").trim();
+          console.log(`Authorize: Final Email: [${email}] (len: ${email.length})`);
+
           const userQueryResult = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
-            .bind(credentials?.email)
+            .bind(email)
             .first();
           
           const user = userQueryResult as { id: string; email: string; role: string; password_hash: string } | null;
 
           if (!user) {
-            console.warn(`DEBUG: No user found for [${credentials?.email}]`);
+            console.warn(`DEBUG: No user found in DB for [${email}]`);
             return null;
           }
-          console.log(`DEBUG: User found in DB: [${user.email}] with role: [${user.role}]`);
+          console.log(`DEBUG: Found user [${user.email}]. Hash prefix: [${user.password_hash.substring(0, 10)}...] (hash len: ${user.password_hash.length})`);
+
+          const inputPass = credentials?.password as string || "";
+          console.log(`DEBUG: Input Password length: ${inputPass.length}`);
 
           console.log("DEBUG: Comparing passwords with bcryptjs...");
-          const isMatch = await bcrypt.compare(credentials?.password as string, user.password_hash);
+          const isMatch = await bcrypt.compare(inputPass, user.password_hash);
           console.log(`DEBUG: Password Match Result: ${isMatch}`);
 
           if (isMatch) {
