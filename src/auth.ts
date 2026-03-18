@@ -47,7 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
           console.log(`DEBUG: Found user [${user.email}]. Hash prefix: [${user.password_hash.substring(0, 10)}...] (hash len: ${user.password_hash.length})`);
 
-          const inputPass = credentials?.password as string || "";
+          const inputPass = (credentials?.password as string || "").trim();
           console.log(`DEBUG: Input Password length: ${inputPass.length}`);
 
           console.log("DEBUG: Comparing passwords with bcryptjs...");

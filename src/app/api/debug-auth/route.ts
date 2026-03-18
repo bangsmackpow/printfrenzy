@@ -53,31 +53,38 @@ export async function GET() {
         .first();
       
       const user = userQueryResult as { email: string; password_hash: string } | null;
+      const edgeHash = await bcrypt.hash(pass, 10);
       
+      const getHex = (s: string) => Array.from(s).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
+
       if (user) {
         const start = Date.now();
         const hash = user.password_hash;
         const cleanHash = hash.trim();
         const isMatch = await bcrypt.compare(pass, cleanHash);
         
-        const getHex = (s: string) => Array.from(s).map(c => c.charCodeAt(0).toString(16)).join(' ');
-        
         results.tests.live_db_check = {
           success: true,
           email: user.email,
-          raw_len: hash.length,
-          clean_len: cleanHash.length,
+          raw_hash_len: hash.length,
           last_chars_hex: getHex(hash.slice(-5)),
+          clean_hash_len: cleanHash.length,
           match: isMatch,
           duration: `${Date.now() - start}ms`
         };
-      } else {
-        results.tests.live_db_check = { success: false, error: "User curtis@printfrenzy.dev not found in DB" };
       }
+
+      results.tests.edge_native_check = {
+        message: "COPY THIS HASH TO YOUR DATABASE IF LIVE_DB_CHECK FAILS",
+        pass: pass,
+        generated_hash: edgeHash,
+        hash_len: edgeHash.length,
+        verified_locally: await bcrypt.compare(pass, edgeHash)
+      };
     }
   } catch (e: unknown) {
     const err = e as Error;
-    results.tests.live_db_check = { success: false, error: err.message };
+    results.tests.error = err.message;
   }
 
   return NextResponse.json(results);

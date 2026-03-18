@@ -4,12 +4,14 @@ import type { NextRequest } from "next/server";
 
 export const runtime = 'edge';
 
-export async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   const session = await auth();
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isPublicFile = request.nextUrl.pathname.match(/\.(png|jpg|jpeg|gif|ico|svg|css|js)$/);
+  const isApiAuth = request.nextUrl.pathname.startsWith("/api/auth");
+  const isDebugAuth = request.nextUrl.pathname === "/api/debug-auth";
 
-  if (!session && !isLoginPage && !isPublicFile) {
+  if (!session && !isLoginPage && !isPublicFile && !isApiAuth && !isDebugAuth) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   
@@ -17,5 +19,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
