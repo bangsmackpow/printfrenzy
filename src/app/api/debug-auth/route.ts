@@ -56,12 +56,18 @@ export async function GET() {
       
       if (user) {
         const start = Date.now();
-        const isMatch = await bcrypt.compare(pass, user.password_hash);
+        const hash = user.password_hash;
+        const cleanHash = hash.trim();
+        const isMatch = await bcrypt.compare(pass, cleanHash);
+        
+        const getHex = (s: string) => Array.from(s).map(c => c.charCodeAt(0).toString(16)).join(' ');
+        
         results.tests.live_db_check = {
           success: true,
           email: user.email,
-          hash_len: user.password_hash.length,
-          hash_prefix: user.password_hash.substring(0, 10),
+          raw_len: hash.length,
+          clean_len: cleanHash.length,
+          last_chars_hex: getHex(hash.slice(-5)),
           match: isMatch,
           duration: `${Date.now() - start}ms`
         };

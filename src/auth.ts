@@ -51,8 +51,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.log(`DEBUG: Input Password length: ${inputPass.length}`);
 
           console.log("DEBUG: Comparing passwords with bcryptjs...");
-          const isMatch = await bcrypt.compare(inputPass, user.password_hash);
-          console.log(`DEBUG: Password Match Result: ${isMatch}`);
+          const cleanHash = user.password_hash.trim();
+          const isMatch = await bcrypt.compare(inputPass, cleanHash);
+          console.log(`DEBUG: Password Match Result: ${isMatch} (Hash length after trim: ${cleanHash.length})`);
 
           if (isMatch) {
             console.log("--- AUTHORIZE SUCCESS ---");
