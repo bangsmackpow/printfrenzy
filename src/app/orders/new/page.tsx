@@ -20,29 +20,21 @@ export default function NewOrder() {
     try {
       // 1. If a file is selected, upload to R2 first
       if (file) {
-        const preRes = await fetch("/api/upload", {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", file);
+        uploadFormData.append("fileName", file.name);
+
+        const uploadRes = await fetch("/api/upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: file.type, fileName: file.name }),
+          body: uploadFormData,
         });
         
-        if (!preRes.ok) {
-          const errData = await preRes.json();
-          throw new Error(errData.error || "Failed to get upload signature");
-        }
-
-        const { signedUrl, publicUrl } = await preRes.json();
-        
-        const uploadRes = await fetch(signedUrl, { 
-          method: "PUT", 
-          body: file, 
-          headers: { "Content-Type": file.type } 
-        });
-
         if (!uploadRes.ok) {
-          throw new Error("Failed to upload file to storage");
+          const errData = await uploadRes.json();
+          throw new Error(errData.error || "Failed to upload file");
         }
 
+        const { publicUrl } = await uploadRes.json();
         finalImageUrl = publicUrl;
       }
 

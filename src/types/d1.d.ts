@@ -9,3 +9,9 @@ interface D1Database {
   prepare: (query: string) => D1PreparedStatement;
   batch: (statements: D1PreparedStatement[]) => Promise<unknown[]>;
 }
+
+interface R2Bucket {
+  put: (key: string, value: ArrayBuffer | string | ReadableStream, options?: { httpMetadata?: { contentType?: string } }) => Promise<void>;
+  get: (key: string) => Promise<{ text: () => Promise<string>, arrayBuffer: () => Promise<ArrayBuffer> } | null>;
+  delete: (key: string) => Promise<void>;
+}

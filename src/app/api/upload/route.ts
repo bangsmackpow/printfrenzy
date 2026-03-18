@@ -1,34 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getR2Client } from "@/utils/r2Client";
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   try {
-    const { contentType, fileName } = await req.json();
-    
-    if (!process.env.R2_BUCKET_NAME || !process.env.ACCOUNT_ID) {
-      return NextResponse.json({ error: "R2 Environment variables missing" }, { status: 500 });
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
+    const fileName = formData.get("fileName") as string || file.name;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    const client = getR2Client(); // Initialize here
-    
+    const bucket = (process.env as unknown as { BUCKET: R2Bucket }).BUCKET;
+    if (!bucket) {
+      console.error("R2 BUCKET BINDING MISSING in env");
+      return NextResponse.json({ error: "R2 Environment binding missing" }, { status: 500 });
+    }
+
     const key = `uploads/${Date.now()}-${fileName}`;
-    const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
-      ContentType: contentType,
+    
+    // Put file into R2 using the binding
+    await bucket.put(key, await file.arrayBuffer(), {
+      httpMetadata: { contentType: file.type }
     });
 
-    const signedUrl = await getSignedUrl(client, command, { expiresIn: 60 });
+    // Public URL (requires a custom domain or public bucket URL)
     const publicUrl = `https://assets.builtnetworks.com/${key}`; 
 
-    return NextResponse.json({ signedUrl, publicUrl });
+    return NextResponse.json({ success: true, publicUrl });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error("Upload signature error:", err);
+    console.error("Upload error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
