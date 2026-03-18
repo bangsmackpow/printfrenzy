@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not Authenticated" }, { status: 401 });
   }
   const data = await req.json() as { order_number: string; customer_name: string; product_name: string; variant: string; image_url: string };
-  const db = (process.env as unknown as { DB: { prepare: (s: string) => { bind: (...args: unknown[]) => { run: () => Promise<void> } } } }).DB;
+  const db = (process.env as unknown as { DB: D1Database }).DB;
   const orderId = crypto.randomUUID();
 
   try {

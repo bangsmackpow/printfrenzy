@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid CSV format" }, { status: 400 });
     }
 
-    const db = (process.env as unknown as { DB: { prepare: (s: string) => { bind: (...args: unknown[]) => { run: () => Promise<void> } } } }).DB;
+    const db = (process.env as unknown as { DB: D1Database }).DB;
 
     // Wix CSVs often have a preamble or specific header row. 
     // We'll use csv-parse with 'columns: true' to map by name.

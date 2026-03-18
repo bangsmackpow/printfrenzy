@@ -16,7 +16,7 @@ export async function GET() {
     return NextResponse.json({ error: "Access Denied: Admin role required" }, { status: 403 });
   }
 
-  const db = (process.env as unknown as { DB: { prepare: (s: string) => { all: () => Promise<{ results: unknown[] }> } } }).DB;
+  const db = (process.env as unknown as { DB: D1Database }).DB;
   const { results } = await db.prepare("SELECT id, email, role, created_at FROM users").all();
   return NextResponse.json(results);
 }
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { email, password, role } = await req.json();
-  const db = (process.env as unknown as { DB: { prepare: (s: string) => { bind: (...args: unknown[]) => { run: () => Promise<void> } } } }).DB;
+  const db = (process.env as unknown as { DB: D1Database }).DB;
   const id = crypto.randomUUID();
   const hashedPassword = await bcrypt.hash(password, 10);
 

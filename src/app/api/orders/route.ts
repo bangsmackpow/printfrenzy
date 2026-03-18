@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status') || 'ORDERED';
   const query = searchParams.get('q') || '';
   
-  const db = (process.env as unknown as { DB: any }).DB;
+  const db = (process.env as unknown as { DB: D1Database }).DB;
 
   try {
     let results;

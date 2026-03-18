@@ -16,7 +16,7 @@ export async function POST(
   }
   
   const { status } = await req.json();
-  const db = (process.env as unknown as { DB: any }).DB;
+  const db = (process.env as unknown as { DB: D1Database }).DB;
   
   const userEmail = session.user?.email || "unknown"; 
 

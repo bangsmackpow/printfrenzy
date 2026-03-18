@@ -24,17 +24,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           } else {
             console.log("DEBUG: AUTH_SECRET IS PRESENT");
           }
-
-          const db = (process.env as any).DB;
+          
+          const db = (process.env as unknown as { DB: D1Database }).DB;
           if (!db) {
             console.error("DEBUG: DB BINDING IS MISSING FROM PROCESS.ENV");
             return null;
           }
           console.log("DEBUG: DB BINDING FOUND");
 
-          const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
+          const userQueryResult = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
             .bind(credentials?.email)
-            .first<{ id: string; email: string; role: string; password_hash: string }>();
+            .first();
+          
+          const user = userQueryResult as { id: string; email: string; role: string; password_hash: string } | null;
 
           if (!user) {
             console.warn(`DEBUG: No user found for [${credentials?.email}]`);
@@ -53,9 +55,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           
           console.warn("--- AUTHORIZE FAILED: PASSWORD MISMATCH ---");
           return null;
-        } catch (error: any) {
-          console.error("CRITICAL: Authorize Exception:", error.message);
-          console.error(error.stack);
+        } catch (error: unknown) {
+          const err = error as Error;
+          console.error("CRITICAL: Authorize Exception:", err.message);
+          console.error(err.stack);
           return null;
         }
       },
