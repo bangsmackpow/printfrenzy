@@ -15,25 +15,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       async authorize(credentials) {
-        const db = (process.env as unknown as { 
-          DB: { 
-            prepare: (s: string) => { 
-              bind: (...args: unknown[]) => { 
-                first: <T>() => Promise<T | null> 
+        try {
+          const db = (process.env as unknown as { 
+            DB: { 
+              prepare: (s: string) => { 
+                bind: (...args: unknown[]) => { 
+                  first: <T>() => Promise<T | null> 
+                } 
               } 
             } 
-          } 
-        }).DB;
-        if (!db) return null;
+          }).DB;
+          
+          if (!db) {
+            console.error("Authorize Error: D1 DB binding NOT found on process.env");
+            return null;
+          }
 
-        const user = await db.prepare("SELECT * FROM users WHERE email = ?")
-          .bind(credentials?.email)
-          .first<{ id: string; email: string; role: string; password_hash: string }>();
+          const user = await db.prepare("SELECT * FROM users WHERE email = ?")
+            .bind(credentials?.email)
+            .first<{ id: string; email: string; role: string; password_hash: string }>();
 
-        if (user && await bcrypt.compare(credentials?.password as string, user.password_hash)) {
-          return { id: user.id, email: user.email, role: user.role };
+          if (!user) {
+            console.warn(`Authorize: User not found with email: ${credentials?.email}`);
+            return null;
+          }
+
+          const isMatch = await bcrypt.compare(credentials?.password as string, user.password_hash);
+          if (isMatch) {
+            return { id: user.id, email: user.email, role: user.role };
+          }
+          
+          console.warn(`Authorize: Password MISMATCH for email: ${credentials?.email}`);
+          return null;
+        } catch (error: unknown) {
+          console.error("Authorize Callback Exception:", error);
+          return null;
         }
-        return null;
       },
     }),
   ],
