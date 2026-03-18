@@ -16,6 +16,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       async authorize(credentials) {
         try {
+          if (!process.env.AUTH_SECRET) {
+            console.error("Authorize Error: AUTH_SECRET is NOT set in environment variables");
+          }
+
           const db = (process.env as unknown as { 
             DB: { 
               prepare: (s: string) => { 
@@ -25,18 +29,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               } 
             } 
           }).DB;
-          
+
           if (!db) {
             console.error("Authorize Error: D1 DB binding NOT found on process.env");
             return null;
           }
 
-          const user = await db.prepare("SELECT * FROM users WHERE email = ?")
+          const user = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
             .bind(credentials?.email)
             .first<{ id: string; email: string; role: string; password_hash: string }>();
 
           if (!user) {
-            console.warn(`Authorize: User not found with email: ${credentials?.email}`);
+            console.warn(`Authorize: User not found (LOWER lookup) for email: ${credentials?.email}`);
             return null;
           }
 
@@ -69,5 +73,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   pages: { signIn: "/login" },
+  trustHost: true,
   secret: process.env.AUTH_SECRET,
 });

@@ -7,11 +7,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       const result = await signIn("credentials", {
         email,
@@ -21,11 +23,13 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError(result.error);
+        setLoading(false);
       } else {
         router.push("/dashboard");
       }
     } catch (err: unknown) {
       setError("An unexpected error occurred during login.");
+      setLoading(false);
     }
   };
 
@@ -43,14 +47,23 @@ export default function LoginPage() {
           placeholder="Email" 
           className="w-full border p-2 mb-4 rounded" 
           onChange={(e) => setEmail(e.target.value)}
+          required
         />
         <input 
           type="password" 
           placeholder="Password" 
           className="w-full border p-2 mb-4 rounded" 
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
-        <button className="w-full bg-blue-600 text-white py-2 rounded font-bold">Sign In</button>
+        <button 
+          disabled={loading}
+          className={`w-full py-2 rounded font-bold text-white transition-colors ${
+            loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {loading ? "Signing in..." : "Sign In"}
+        </button>
       </form>
     </div>
   );
