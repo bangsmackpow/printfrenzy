@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "experimental-edge";
 
 export default async function proxy(request: NextRequest) {
   const session = await auth();
