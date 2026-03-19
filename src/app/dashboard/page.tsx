@@ -229,16 +229,45 @@ function DashboardContent() {
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Production Batch</p>
                   </div>
 
-                  <div className="space-y-3 mb-6 flex-grow">
+                  <div className="space-y-4 mb-6 flex-grow">
                     {items.map((item) => (
-                      <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 relative group/item">
-                        <div className="flex justify-between items-start mb-1">
-                            <p className="text-xs font-black text-slate-800 leading-tight flex-grow pr-2">{item.product_name}</p>
-                            <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600 text-[10px] font-black">x{item.quantity}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 italic">
-                          <span>{item.variant}</span>
-                          <span className="text-slate-400">{item.customer_name}</span>
+                      <div key={item.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group/item hover:bg-white hover:shadow-md transition-all duration-200">
+                        <div className="flex gap-3">
+                          {/* Image Thumbnail with individual click */}
+                          <div className="h-16 w-16 flex-shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden relative group/img">
+                            <img 
+                                src={getPrinterQualityImage(item.image_url)} 
+                                alt={item.product_name}
+                                className="h-full w-full object-contain p-1"
+                            />
+                            <a 
+                                href={item.image_url} 
+                                target="_blank" 
+                                className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all"
+                            >
+                                <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" /></svg>
+                            </a>
+                          </div>
+
+                          <div className="flex-grow min-w-0">
+                            <div className="flex justify-between items-start">
+                                <h4 className="text-[11px] font-black text-slate-800 leading-tight truncate pr-1">{item.product_name}</h4>
+                                <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600 text-[9px] font-black">x{item.quantity}</span>
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase italic truncate">{item.customer_name}</p>
+                            <div className="flex items-center justify-between mt-2">
+                                <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold truncate max-w-[120px]">{item.variant}</span>
+                                
+                                {/* Individual status update */}
+                                <button 
+                                  onClick={() => updateStatus(item.id, activeStatus === 'ORDERED' ? 'PRINTED' : 'COMPLETED')}
+                                  className="h-6 w-6 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all ml-2"
+                                  title="Push to Next Stage"
+                                >
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -248,20 +277,20 @@ function DashboardContent() {
                     {activeStatus === 'ORDERED' && (
                       <button 
                         onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
-                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
                       >
                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                        Batch Print
+                        Move Entire Batch
                       </button>
                     )}
                     
                     {activeStatus === 'PRINTED' && (
                       <button 
                         onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
                       >
                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Batch Complete
+                        Complete Entire Batch
                       </button>
                     )}
                     <button 
