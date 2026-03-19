@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 interface User {
   id: string;
@@ -11,6 +11,7 @@ interface User {
 }
 
 export default function UserAdmin() {
+  const { data: session } = useSession();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
@@ -18,6 +19,8 @@ export default function UserAdmin() {
   const [role, setRole] = useState("USER");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -86,35 +89,37 @@ export default function UserAdmin() {
             <p className="text-slate-500 mt-2 font-medium">Manage access and roles for the DTF production team.</p>
           </div>
           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex gap-2">
-            <button 
-              onClick={async () => {
-                const confirmation = window.confirm("CRITICAL WARNING: This will permanently delete ALL orders and historical logs from the system. This cannot be undone.\n\nYou must provide your password to proceed.");
-                if (!confirmation) return;
-                
-                const pass = prompt("Please enter your Admin Password to confirm the system-wide deletion:");
-                if (!pass) return;
+            {isAdmin && (
+              <button 
+                onClick={async () => {
+                  const confirmation = window.confirm("CRITICAL WARNING: This will permanently delete ALL orders and historical logs from the system. This cannot be undone.\n\nYou must provide your password to proceed.");
+                  if (!confirmation) return;
+                  
+                  const pass = prompt("Please enter your Admin Password to confirm the system-wide deletion:");
+                  if (!pass) return;
 
-                setSubmitting(true);
-                try {
-                  const res = await fetch('/api/admin/orders/clear', { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pass })
-                  });
-                  if (res.ok) {
-                    alert("SYSTEM CLEARED: All data has been successfully removed.");
-                    window.location.reload();
-                  } else {
-                    const data = await res.json();
-                    alert("Clear failed: " + (data.error || "Unknown error"));
-                  }
-                } catch (e) { alert("Failed to connect to server."); }
-                finally { setSubmitting(false); }
-              }}
-              className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-            >
-              Clear All Orders
-            </button>
+                  setSubmitting(true);
+                  try {
+                    const res = await fetch('/api/admin/orders/clear', { 
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ password: pass })
+                    });
+                    if (res.ok) {
+                      alert("SYSTEM CLEARED: All data has been successfully removed.");
+                      window.location.reload();
+                    } else {
+                      const data = await res.json();
+                      alert("Clear failed: " + (data.error || "Unknown error"));
+                    }
+                  } catch (e) { alert("Failed to connect to server."); }
+                  finally { setSubmitting(false); }
+                }}
+                className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+              >
+                Clear All Orders
+              </button>
+            )}
             <button onClick={fetchUsers} className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all">
               <svg className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

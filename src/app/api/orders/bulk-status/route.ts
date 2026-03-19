@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { order_number, status } = await req.json();
+  const { order_number, status, customer_name } = await req.json();
   if (!order_number) {
     return NextResponse.json({ error: "No order number provided" }, { status: 400 });
   }
@@ -18,13 +18,21 @@ export async function POST(req: NextRequest) {
   const userEmail = session.user?.email || "unknown";
 
   try {
+    let whereClause = "WHERE order_number = ?";
+    let params = [order_number];
+
+    if (customer_name) {
+      whereClause += " AND customer_name = ?";
+      params.push(customer_name);
+    }
+
     // Collect IDs for audit log
-    const items = await db.prepare("SELECT id FROM orders WHERE order_number = ?")
-      .bind(order_number)
+    const items = await db.prepare(`SELECT id FROM orders ${whereClause}`)
+      .bind(...params)
       .all();
 
-    const updateStmt = db.prepare("UPDATE orders SET status = ? WHERE order_number = ?")
-      .bind(status, order_number);
+    const updateStmt = db.prepare(`UPDATE orders SET status = ? ${whereClause}`)
+      .bind(status, ...params);
 
     const auditStmts = items.results.map((item: any) => 
       db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")

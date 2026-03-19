@@ -70,16 +70,20 @@ function DashboardContent() {
     }
   };
 
-  const bulkUpdateStatus = async (orderNumber: string, newStatus: OrderStatus) => {
+  const bulkUpdateStatus = async (orderNumber: string, customerName: string, newStatus: OrderStatus) => {
     try {
       const res = await fetch(`/api/orders/bulk-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_number: orderNumber, status: newStatus }),
+        body: JSON.stringify({ 
+          order_number: orderNumber, 
+          customer_name: customerName, 
+          status: newStatus 
+        }),
       });
 
       if (res.ok) {
-        setOrders(orders.filter(o => o.order_number !== orderNumber));
+        setOrders(orders.filter(o => !(o.order_number === orderNumber && o.customer_name === customerName)));
       } else {
         alert("Failed to update group status.");
       }
@@ -90,7 +94,9 @@ function DashboardContent() {
 
   // Grouping logic for rendering
   const groupedOrders = orders.reduce((acc, order) => {
-    const key = order.order_number || order.id;
+    const key = order.order_number 
+      ? `${order.order_number}-${order.customer_name}` 
+      : order.id;
     if (!acc[key]) acc[key] = [];
     acc[key].push(order);
     return acc;
@@ -237,7 +243,7 @@ function DashboardContent() {
                   <div className="flex gap-2 mt-auto">
                     {activeStatus === 'ORDERED' && (
                       <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, items[0].customer_name, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
                         className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
@@ -246,7 +252,7 @@ function DashboardContent() {
                     )}
                     {activeStatus === 'PRINTED' && (
                       <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, items[0].customer_name, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
                         className="w-full bg-blue-600 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
                         Complete Order
@@ -254,8 +260,10 @@ function DashboardContent() {
                     )}
                     <button 
                       onClick={async () => {
-                        if (window.confirm(`Delete order #${items[0].order_number || 'Manual'}?`)) {
-                          const query = items[0].order_number ? `order_number=${items[0].order_number}` : `id=${items[0].id}`;
+                        if (window.confirm(`Delete items for ${items[0].customer_name}?`)) {
+                          const query = items[0].order_number 
+                            ? `order_number=${items[0].order_number}&customer_name=${encodeURIComponent(items[0].customer_name)}` 
+                            : `id=${items[0].id}`;
                           try {
                             const res = await fetch(`/api/orders/delete?${query}`, { method: 'DELETE' });
                             if (res.ok) fetchOrders();
