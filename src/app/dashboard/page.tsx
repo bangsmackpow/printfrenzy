@@ -234,19 +234,33 @@ function DashboardContent() {
                       <div key={item.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group/item hover:bg-white hover:shadow-md transition-all duration-200">
                         <div className="flex gap-3">
                           {/* Image Thumbnail with individual click */}
-                          <div className="h-16 w-16 flex-shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden relative group/img">
+                          <div className="h-16 w-16 flex-shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden relative group/img z-10">
                             <img 
                                 src={getPrinterQualityImage(item.image_url)} 
                                 alt={item.product_name}
                                 className="h-full w-full object-contain p-1"
                             />
-                            <a 
-                                href={item.image_url} 
-                                target="_blank" 
-                                className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all"
-                            >
-                                <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" /></svg>
-                            </a>
+                            {/* 500x500 Hover Preview Overlay */}
+                            <div className="absolute inset-0 z-20 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                <a 
+                                    href={item.image_url} 
+                                    target="_blank" 
+                                    className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"
+                                >
+                                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" /></svg>
+                                </a>
+                                <div className="hidden group-hover/img:block absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-[500px] h-[500px] bg-white rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-200 overflow-hidden z-[9999] pointer-events-none p-4 origin-bottom scale-90 animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="absolute top-4 left-6 right-6 flex items-center justify-between text-[10px] font-black uppercase text-slate-400">
+                                        <span>High-Res Master</span>
+                                        <span>Click to Download Full</span>
+                                    </div>
+                                    <img 
+                                        src={getPrinterQualityImage(item.image_url)} 
+                                        alt="Preview" 
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                            </div>
                           </div>
 
                           <div className="flex-grow min-w-0">

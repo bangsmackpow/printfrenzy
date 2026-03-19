@@ -5,7 +5,8 @@ export const runtime = 'edge';
 
 export async function DELETE(req: NextRequest) {
   const session = await auth();
-  if (!session || (session.user as any).role !== 'ADMIN') {
+  const userRole = (session?.user as any)?.role;
+  if (!session || (userRole !== 'ADMIN' && userRole !== 'MANAGER')) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

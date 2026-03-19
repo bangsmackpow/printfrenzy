@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not Authenticated" }, { status: 401 });
   }
 
-  const { order_number, customer_name, image_url, items } = await req.json() as ManualOrderData;
+  const { order_number, customer_name, items } = await req.json() as { 
+    order_number: string, 
+    customer_name: string, 
+    items: (ManualOrderItem & { image_url: string })[] 
+  };
   const db = (process.env as unknown as { DB: D1Database }).DB;
   const ordered_at = new Date().toISOString();
 
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
         finalCustomer, 
         item.product_name, 
         item.variant, 
-        image_url,
+        item.image_url, // Use the row-specific image
         ordered_at,
         item.quantity || 1
       );
