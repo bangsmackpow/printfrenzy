@@ -51,6 +51,7 @@ export default function NewOrder() {
           customer_name: formData.get("customer_name"),
           product_name: formData.get("product_name"),
           variant: formData.get("variant"),
+          quantity: parseInt(formData.get("quantity") as string || "1", 10),
           image_url: finalImageUrl,
         }),
       });
@@ -151,13 +152,25 @@ export default function NewOrder() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Alternative: Wix URL</label>
-                <input 
-                  name="image_url" 
-                  placeholder="Paste Wix design URL if no file uploaded" 
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm font-medium placeholder:text-slate-300 italic" 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Quantity</label>
+                  <input 
+                    name="quantity" 
+                    type="number"
+                    defaultValue="1"
+                    min="1"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm font-bold" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Alternative: Wix URL</label>
+                  <input 
+                    name="image_url" 
+                    placeholder="Paste Wix design URL" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm font-medium placeholder:text-slate-300 italic" 
+                  />
+                </div>
               </div>
             </div>
 

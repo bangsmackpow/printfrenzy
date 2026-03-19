@@ -11,6 +11,7 @@ interface Order {
   customer_name: string;
   product_name: string;
   variant: string;
+  quantity: number;
   image_url: string;
   status: string;
   created_at: string;
@@ -195,9 +196,15 @@ function DashboardContent() {
                     </p>
                   </div>
                   
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6 flex-grow">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Options</span>
-                    <p className="text-sm font-bold text-slate-700">{order.variant || 'Standard'}</p>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6 flex-grow flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Options</span>
+                      <p className="text-sm font-bold text-slate-700">{order.variant || 'Standard'}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Qty</span>
+                      <p className="text-lg font-black text-blue-600 leading-none">{order.quantity || 1}</p>
+                    </div>
                   </div>
 
                   <div className="flex gap-2">

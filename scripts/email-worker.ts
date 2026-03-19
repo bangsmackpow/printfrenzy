@@ -12,47 +12,87 @@
 import PostalMime from 'postal-mime';
 
 export default {
-  async email(message, env, ctx) {
+  async email(message: any, env: any, ctx: any) {
     const parser = new PostalMime();
     const email = await parser.parse(message.raw);
+    const logs: string[] = [];
+    const log = (msg: string) => {
+      console.log(msg);
+      logs.push(`${new Date().toISOString()}: ${msg}`);
+    };
+
+    log(`Received email from: ${message.from}`);
 
     // Look for CSV attachments
-    const csvAttachments = email.attachments.filter(att => 
+    const csvAttachments = email.attachments.filter((att: any) => 
       att.filename.toLowerCase().endsWith('.csv') || 
       att.mimeType === 'text/csv'
     );
 
     if (csvAttachments.length === 0) {
-      console.log("No CSV attachments found. Skipping.");
+      log("No CSV attachments found. Skipping.");
       return;
     }
 
+    let successCount = 0;
+    let failCount = 0;
+
     for (const attachment of csvAttachments) {
-      console.log(`Processing attachment: ${attachment.filename}`);
+      log(`Processing attachment: ${attachment.filename}`);
       
       const formData = new FormData();
-      // Convert attachment content (ArrayBuffer) to a Blob for FormData
       const blob = new Blob([attachment.content], { type: 'text/csv' });
       formData.append('file', blob, attachment.filename);
 
       try {
         const response = await fetch(env.IMPORT_API_URL, {
           method: 'POST',
-          headers: {
-            'x-api-key': env.IMPORT_API_KEY
-          },
+          headers: { 'x-api-key': env.IMPORT_API_KEY },
           body: formData
         });
 
         if (response.ok) {
-          const result = await response.json();
-          console.log(`Successfully imported ${result.count} orders from ${attachment.filename}`);
+          const result = (await response.json()) as any;
+          successCount += result.count;
+          log(`Successfully imported ${result.count} orders from ${attachment.filename}`);
         } else {
+          failCount++;
           const errorText = await response.text();
-          console.error(`Failed to import ${attachment.filename}:`, errorText);
+          log(`FAILED to import ${attachment.filename}: ${errorText}`);
         }
-      } catch (err) {
-        console.error(`Error sending ${attachment.filename} to API:`, err);
+      } catch (err: any) {
+        failCount++;
+        log(`CRITICAL ERROR during ${attachment.filename} import: ${err.message}`);
+      }
+    }
+
+    // If any failures occurred, reply to the sender with the logs
+    if (failCount > 0) {
+      const replyBody = `
+PrintFrenzy Import Report (FAILURE)
+      
+Your recent CSV import attempt encountered errors.
+Total Success: ${successCount} orders
+Total Failed: ${failCount} files
+
+Detailed Log:
+${logs.join('\n')}
+
+Please check your CSV format and try again.
+      `.trim();
+
+      // Cloudflare EmailMessage requires a raw email string for the body
+      const rawReply = `From: ${message.to}\r\nTo: ${message.from}\r\nSubject: Import Failure: PrintFrenzy\r\n\r\n${replyBody}`;
+      
+      try {
+        // Attempting to use the new reply() method (Check Cloudflare compatibility)
+        if (typeof message.reply === 'function') {
+          // @ts-expect-error - reply exists in Email Workers
+          await message.reply(new EmailMessage(message.to, message.from, rawReply));
+          console.log("Sent failure reply to sender.");
+        }
+      } catch (e) {
+        console.error("Failed to send reply:", e);
       }
     }
   }

@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       const variant = (record['Product variant'] || record['Lineitem options'] || record['variant'] || '').trim();
       const imageUrl = record['Product image'] || record['Lineitem image URL'] || record['image_url'];
       const orderedAt = record['Date'] || record['ordered_at'];
+      const quantity = parseInt(record['Quantity'] || '1', 10) || 1;
 
       if (!imageUrl || !orderNumber) {
         skipCount++;
@@ -67,8 +68,8 @@ export async function POST(req: NextRequest) {
       }
 
       await db.prepare(`
-        INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'ORDERED')
+        INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ORDERED')
       `).bind(
         crypto.randomUUID(),
         orderNumber,
@@ -76,7 +77,8 @@ export async function POST(req: NextRequest) {
         productName,
         variant,
         imageUrl,
-        orderedAt
+        orderedAt,
+        quantity
       ).run();
 
       importCount++;
