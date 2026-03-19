@@ -88,13 +88,28 @@ export default function UserAdmin() {
           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex gap-2">
             <button 
               onClick={async () => {
-                if (window.confirm("CRITICAL: This will permanently delete ALL orders and production logs. Proceed?")) {
-                  try {
-                    const res = await fetch('/api/admin/orders/clear', { method: 'POST' });
-                    if (res.ok) alert("System cleared!");
-                    else alert("Failed to clear system.");
-                  } catch (e) { alert("An error occurred."); }
-                }
+                const confirmation = window.confirm("CRITICAL WARNING: This will permanently delete ALL orders and historical logs from the system. This cannot be undone.\n\nYou must provide your password to proceed.");
+                if (!confirmation) return;
+                
+                const pass = prompt("Please enter your Admin Password to confirm the system-wide deletion:");
+                if (!pass) return;
+
+                setSubmitting(true);
+                try {
+                  const res = await fetch('/api/admin/orders/clear', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pass })
+                  });
+                  if (res.ok) {
+                    alert("SYSTEM CLEARED: All data has been successfully removed.");
+                    window.location.reload();
+                  } else {
+                    const data = await res.json();
+                    alert("Clear failed: " + (data.error || "Unknown error"));
+                  }
+                } catch (e) { alert("Failed to connect to server."); }
+                finally { setSubmitting(false); }
               }}
               className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
             >
