@@ -6,7 +6,8 @@ export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session || (session.user as any).role !== 'ADMIN') {
+  const userRole = (session?.user as { role?: string })?.role;
+  if (!session || userRole !== 'ADMIN') {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
@@ -16,9 +17,9 @@ export async function POST(req: NextRequest) {
   try {
     // Verify admin password
     const userEmail = session.user?.email;
-    const adminUser = await db.prepare("SELECT password FROM users WHERE email = ?").bind(userEmail).first() as any;
+    const adminUser = await db.prepare("SELECT password_hash FROM users WHERE email = ?").bind(userEmail).first() as { password_hash: string } | null;
     
-    if (!adminUser || !(await bcrypt.compare(password, adminUser.password))) {
+    if (!adminUser || !(await bcrypt.compare(password, adminUser.password_hash))) {
       return NextResponse.json({ error: "Invalid password. Action aborted." }, { status: 401 });
     }
 
@@ -29,8 +30,9 @@ export async function POST(req: NextRequest) {
     ]);
 
     return NextResponse.json({ success: true, message: "System cleared." });
-  } catch (error: any) {
-    console.error("Clear orders error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("Clear orders error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
