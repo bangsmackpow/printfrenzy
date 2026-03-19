@@ -70,6 +70,32 @@ function DashboardContent() {
     }
   };
 
+  const bulkUpdateStatus = async (orderNumber: string, newStatus: OrderStatus) => {
+    try {
+      const res = await fetch(`/api/orders/bulk-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_number: orderNumber, status: newStatus }),
+      });
+
+      if (res.ok) {
+        setOrders(orders.filter(o => o.order_number !== orderNumber));
+      } else {
+        alert("Failed to update group status.");
+      }
+    } catch (err) {
+      console.error("Bulk status update error:", err);
+    }
+  };
+
+  // Grouping logic for rendering
+  const groupedOrders = orders.reduce((acc, order) => {
+    const key = order.order_number || order.id;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(order);
+    return acc;
+  }, {} as Record<string, Order[]>);
+
   const statusTabs: { label: string; value: OrderStatus; count?: number }[] = [
     { label: 'Production Queue', value: 'ORDERED' },
     { label: 'Printed / Waiting', value: 'PRINTED' },
@@ -107,11 +133,9 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Search and Filter Bar */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
-            {/* Tabs */}
             <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
               {statusTabs.map((tab) => (
                 <button
@@ -128,7 +152,6 @@ function DashboardContent() {
               ))}
             </div>
 
-            {/* Search */}
             <div className="relative w-full md:w-96">
               <input
                 type="text"
@@ -146,30 +169,16 @@ function DashboardContent() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error === 'unauthorized' && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-300">
-            <p className="font-bold flex items-center">
-              <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/></svg>
-              Access Denied
-            </p>
-            <p className="text-sm opacity-90">You do not have administrative permissions for that action.</p>
-          </div>
-        )}
-
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
               {statusTabs.find(t => t.value === activeStatus)?.label}
             </h1>
             <p className="text-slate-500 mt-1 font-medium">
-              {loading ? 'Refreshing...' : `${orders.length} orders found`}
+              {loading ? 'Refreshing...' : `${Object.keys(groupedOrders).length} unique orders`}
             </p>
           </div>
-          <button 
-            onClick={fetchOrders}
-            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Refresh"
-          >
+          <button onClick={fetchOrders} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             <svg className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
@@ -181,87 +190,66 @@ function DashboardContent() {
             <div className="animate-pulse flex flex-col items-center">
               <div className="h-12 w-12 bg-blue-100 rounded-full mb-4"></div>
               <div className="h-4 w-32 bg-slate-200 rounded mb-2"></div>
-              <div className="h-3 w-48 bg-slate-100 rounded"></div>
             </div>
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-32 bg-white rounded-3xl border border-slate-200 shadow-sm border-dashed">
-            <div className="bg-slate-50 h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-slate-400">No orders found here</h2>
-            <p className="text-slate-400 mt-2">Try changing your search or checking another tab.</p>
+          <div className="text-center py-32 bg-white rounded-3xl border border-dashed text-slate-400">
+            No orders found.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {orders.map((order) => (
-              <div key={order.id} className="group bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hover:shadow-xl hover:border-blue-200 transition-all duration-300 hover:-translate-y-1">
-                {/* Print Preview Area */}
-                <div className="aspect-square bg-[#fcfcfc] relative overflow-hidden">
+            {Object.entries(groupedOrders).map(([groupKey, items]) => (
+              <div key={groupKey} className="group bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hover:shadow-xl transition-all duration-300">
+                <div className="aspect-square bg-slate-50 relative">
                   <img 
-                    src={getPrinterQualityImage(order.image_url)} 
-                    alt={order.product_name}
-                    className="w-full h-full object-contain p-6 group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
+                    src={getPrinterQualityImage(items[0].image_url)} 
+                    alt="Order Thumb"
+                    className="w-full h-full object-contain p-4"
                   />
-                  <div className="absolute top-4 left-4">
-                    <span className="bg-white/90 backdrop-blur shadow-sm text-slate-900 text-xs font-black px-3 py-1.5 rounded-full border border-slate-100">
-                      #{order.order_number || 'MANUAL'}
-                    </span>
+                  <div className="absolute top-4 left-4 bg-white/90 px-3 py-1 rounded-full text-xs font-black border">
+                    #{items[0].order_number || 'MANUAL'}
                   </div>
+                  {items.length > 1 && (
+                    <div className="absolute bottom-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase">
+                      {items.length} Items in Order
+                    </div>
+                  )}
                 </div>
 
-                {/* Order Details */}
-                <div className="p-6 flex-grow flex flex-col bg-white">
+                <div className="p-6 flex-grow flex flex-col">
                   <div className="mb-4">
-                    <h3 className="font-extrabold text-slate-900 text-lg leading-tight mb-1 group-hover:text-blue-600 transition-colors">
-                      {order.product_name}
-                    </h3>
-                    <p className="text-sm text-slate-500 flex items-center">
-                      <svg className="h-4 w-4 mr-1.5 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/></svg>
-                      {order.customer_name}
-                    </p>
-                  </div>
-                  
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6 flex-grow flex justify-between items-center">
-                    <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Options</span>
-                      <p className="text-sm font-bold text-slate-700">{order.variant || 'Standard'}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Qty</span>
-                      <p className="text-lg font-black text-blue-600 leading-none">{order.quantity || 1}</p>
-                    </div>
+                    <h3 className="font-extrabold text-slate-800 truncate">{items[0].customer_name}</h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Multi-Item Shipments</p>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="space-y-3 mb-6 flex-grow">
+                    {items.map((item) => (
+                      <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 relative group/item">
+                        <p className="text-xs font-black text-slate-800 leading-tight mb-1">{item.product_name}</p>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                          <span>{item.variant}</span>
+                          <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600">x{item.quantity}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 mt-auto">
                     {activeStatus === 'ORDERED' && (
                       <button 
-                        onClick={() => updateStatus(order.id, 'PRINTED')}
-                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-slate-200 hover:shadow-blue-200 active:scale-95 flex items-center justify-center gap-2"
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
+                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                        Mark Printed
+                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                        Mark All Printed
                       </button>
                     )}
                     {activeStatus === 'PRINTED' && (
                       <button 
-                        onClick={() => updateStatus(order.id, 'COMPLETED')}
-                        className="w-full bg-blue-600 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-blue-200 hover:shadow-green-200 active:scale-95 flex items-center justify-center gap-2"
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
+                        className="w-full bg-blue-600 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         Complete Order
-                      </button>
-                    )}
-                    {(activeStatus === 'COMPLETED' || activeStatus === 'PRINTED') && (
-                      <button 
-                        onClick={() => updateStatus(order.id, 'ORDERED')}
-                        className="p-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-all active:scale-95"
-                        title="Move to Queue"
-                      >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                       </button>
                     )}
                   </div>

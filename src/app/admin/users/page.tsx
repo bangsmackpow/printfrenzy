@@ -86,6 +86,20 @@ export default function UserAdmin() {
             <p className="text-slate-500 mt-2 font-medium">Manage access and roles for the DTF production team.</p>
           </div>
           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex gap-2">
+            <button 
+              onClick={async () => {
+                if (window.confirm("CRITICAL: This will permanently delete ALL orders and production logs. Proceed?")) {
+                  try {
+                    const res = await fetch('/api/admin/orders/clear', { method: 'POST' });
+                    if (res.ok) alert("System cleared!");
+                    else alert("Failed to clear system.");
+                  } catch (e) { alert("An error occurred."); }
+                }
+              }}
+              className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+            >
+              Clear All Orders
+            </button>
             <button onClick={fetchUsers} className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all">
               <svg className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
