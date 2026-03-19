@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { signOut } from "next-auth/react";
 import Image from 'next/image';
@@ -26,7 +26,6 @@ function DashboardContent() {
   const [activeStatus, setActiveStatus] = useState<OrderStatus>('ORDERED');
   const [searchQuery, setSearchQuery] = useState('');
   
-  const searchParams = useSearchParams();
   const router = useRouter();
 
   const fetchOrders = useCallback(async () => {
@@ -207,12 +206,15 @@ function DashboardContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {Object.entries(groupedOrders).map(([groupKey, items]) => (
               <div key={groupKey} className="group bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hover:shadow-xl transition-all duration-300">
-                <div className="aspect-square bg-slate-50 relative">
+                <div 
+                    className="aspect-square bg-slate-50 relative cursor-pointer group/cardimg"
+                    onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
+                >
                   <Image 
                     src={getPrinterQualityImage(items[0].image_url)} 
                     alt="Order Thumb"
                     fill
-                    className="object-contain p-4"
+                    className="object-contain p-4 group-hover/cardimg:scale-105 transition-transform"
                     unoptimized
                   />
                   <div className="absolute top-4 left-4 bg-white/90 px-3 py-1 rounded-full text-xs font-black border">
@@ -223,16 +225,25 @@ function DashboardContent() {
                       {items.length} Items in Order
                     </div>
                   )}
+                  {/* View Details Overlay */}
+                  <div className="absolute inset-0 bg-slate-900/0 group-hover/cardimg:bg-slate-900/10 flex items-center justify-center transition-all">
+                      <span className="bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase scale-0 group-hover/cardimg:scale-100 transition-all shadow-xl">View Details</span>
+                  </div>
                 </div>
 
                 <div className="p-6 flex-grow flex flex-col">
                   <div className="mb-4">
-                    <h3 className="font-extrabold text-slate-800 truncate">{items[0].order_number || 'Manual Order'}</h3>
+                    <h3 
+                        className="font-extrabold text-slate-800 truncate cursor-pointer hover:text-blue-600"
+                        onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
+                    >
+                        {items[0].order_number || 'Manual Order'}
+                    </h3>
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Production Batch</p>
                   </div>
 
                   <div className="space-y-4 mb-6 flex-grow">
-                    {items.map((item) => (
+                    {items.slice(0, 4).map((item) => (
                       <div key={item.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group/item hover:bg-white hover:shadow-md transition-all duration-200">
                         <div className="flex gap-3">
                           {/* Image Thumbnail with individual click */}
@@ -244,10 +255,10 @@ function DashboardContent() {
                                 className="object-contain p-1"
                                 unoptimized
                             />
-                            {/* 500x500 Hover Preview Overlay */}
+                            {/* Hover Preview Overlay */}
                             <div className="absolute inset-0 z-20 opacity-0 group-hover/img:opacity-100 transition-opacity">
                                 <a 
-                                    href={item.image_url} 
+                                    href={getPrinterQualityImage(item.image_url, true)} 
                                     target="_blank" 
                                     className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"
                                 >
@@ -260,7 +271,7 @@ function DashboardContent() {
                                     </div>
                                     <div className="relative w-full h-full">
                                         <Image 
-                                            src={getPrinterQualityImage(item.image_url)} 
+                                            src={getPrinterQualityImage(item.image_url, true)} 
                                             alt="Preview" 
                                             fill
                                             className="object-contain"
@@ -293,6 +304,14 @@ function DashboardContent() {
                         </div>
                       </div>
                     ))}
+                    {items.length > 4 && (
+                        <button 
+                            onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
+                            className="w-full py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-blue-50 hover:text-blue-600 transition-all"
+                        >
+                            + {items.length - 4} more items...
+                        </button>
+                    )}
                   </div>
 
                   <div className="flex gap-2 mt-auto">
@@ -302,7 +321,7 @@ function DashboardContent() {
                         className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
                       >
                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                        Move Entire Batch
+                        Move Batch
                       </button>
                     )}
                     
@@ -312,7 +331,7 @@ function DashboardContent() {
                         className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
                       >
                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Complete Entire Batch
+                        Complete
                       </button>
                     )}
                     <button 

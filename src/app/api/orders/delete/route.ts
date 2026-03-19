@@ -5,7 +5,7 @@ export const runtime = 'edge';
 
 export async function DELETE(req: NextRequest) {
   const session = await auth();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { role?: string })?.role;
   if (!session || (userRole !== 'ADMIN' && userRole !== 'MANAGER')) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -22,19 +22,35 @@ export async function DELETE(req: NextRequest) {
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
   try {
+    const stmts: unknown[] = [];
+
     if (orderNumber) {
+      // 1. Delete audit logs referencing these orders
+      stmts.push(db.prepare(`
+        DELETE FROM audit_logs 
+        WHERE order_id IN (
+          SELECT id FROM orders 
+          WHERE order_number = ? ${customerName ? 'AND customer_name = ?' : ''}
+        )
+      `).bind(...(customerName ? [orderNumber, customerName] : [orderNumber])));
+
+      // 2. Delete the orders
       if (customerName) {
-        await db.prepare("DELETE FROM orders WHERE order_number = ? AND customer_name = ?")
-          .bind(orderNumber, customerName)
-          .run();
+        stmts.push(db.prepare("DELETE FROM orders WHERE order_number = ? AND customer_name = ?")
+          .bind(orderNumber, customerName));
       } else {
-        await db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber).run();
+        stmts.push(db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber));
       }
     } else {
-      await db.prepare("DELETE FROM orders WHERE id = ?").bind(id).run();
+      // Single item delete
+      stmts.push(db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id));
+      stmts.push(db.prepare("DELETE FROM orders WHERE id = ?").bind(id));
     }
+
+    await db.batch(stmts as any);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
