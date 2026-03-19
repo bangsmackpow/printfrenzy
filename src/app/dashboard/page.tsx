@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
