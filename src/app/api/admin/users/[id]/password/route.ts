@@ -6,7 +6,7 @@ export const runtime = 'edge';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session || (session.user as any).role !== 'ADMIN') {
@@ -19,7 +19,7 @@ export async function POST(
       return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const db = (process.env as unknown as { DB: D1Database }).DB;
     const passwordHash = await bcrypt.hash(password, 10);
 
