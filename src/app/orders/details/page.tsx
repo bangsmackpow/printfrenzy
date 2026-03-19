@@ -44,6 +44,37 @@ function DetailContent() {
     fetchDetails();
   }, [fetchDetails]);
 
+  const updateStatus = async (orderId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'ORDERED' ? 'PRINTED' : 'COMPLETED';
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (res.ok) {
+        setItems(prev => prev.map(item => item.id === orderId ? { ...item, status: nextStatus } : item));
+      }
+    } catch (err) {
+      console.error("Status update error:", err);
+    }
+  };
+
+  const deleteItem = async (id: string, name: string) => {
+    if (!window.confirm(`Delete ${name}?`)) return;
+    try {
+      const res = await fetch(`/api/orders/delete?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setItems(prev => prev.filter(i => i.id !== id));
+      } else {
+        const data = await res.json();
+        alert(`Delete failed: ${data.error}`);
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
+
   // Grouping items by Customer Name for categorization
   const groupedByCustomer = items.reduce((acc, item) => {
     const name = item.customer_name || 'Generic Batch Item';
@@ -85,7 +116,7 @@ function DetailContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {rows.map((row) => (
-                  <div key={row.id} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl shadow-slate-200/50 hover:shadow-2xl transition-all border-b-[6px] border-b-blue-600">
+                  <div key={row.id} className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl shadow-slate-200/50 hover:shadow-2xl transition-all border-b-[6px] border-b-blue-600 flex flex-col">
                     <div className="aspect-square relative rounded-[1.5rem] overflow-hidden bg-slate-50 border border-slate-100 group">
                       <Image 
                         src={getPrinterQualityImage(row.image_url, true)} 
@@ -105,7 +136,7 @@ function DetailContent() {
                       </a>
                     </div>
                     
-                    <div className="mt-8 space-y-4">
+                    <div className="mt-8 space-y-4 flex-grow flex flex-col">
                         <div>
                             <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-1">Product Description</p>
                             <h3 className="text-lg font-black text-slate-900 leading-tight">{row.product_name}</h3>
@@ -122,7 +153,7 @@ function DetailContent() {
                             </div>
                         </div>
                         
-                        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
                             <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
                                 row.status === 'ORDERED' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
                                 row.status === 'PRINTED' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
@@ -130,6 +161,24 @@ function DetailContent() {
                             }`}>
                                 {row.status}
                             </span>
+                            
+                            <div className="flex gap-2">
+                                <button 
+                                  onClick={() => deleteItem(row.id, row.product_name)}
+                                  className="h-9 w-9 bg-red-50 text-red-500 rounded-xl flex items-center justify-center border border-red-100 hover:bg-red-500 hover:text-white transition-all"
+                                  title="Delete Item"
+                                >
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                                {row.status !== 'COMPLETED' && (
+                                    <button 
+                                        onClick={() => updateStatus(row.id, row.status)}
+                                        className="h-9 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2"
+                                    >
+                                        Push ➔
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                   </div>
