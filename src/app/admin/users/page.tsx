@@ -192,8 +192,36 @@ export default function UserAdmin() {
                         <td className="px-8 py-6">
                           <span className={getRoleBadge(u.role)}>{u.role}</span>
                         </td>
-                        <td className="px-8 py-6 text-right font-medium text-slate-500 text-sm">
-                          {new Date(u.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                        <td className="px-8 py-6 text-right">
+                          <button 
+                            onClick={async () => {
+                              const newPass = prompt(`Enter new password for ${u.email}:`);
+                              if (!newPass) return;
+                              setSubmitting(true);
+                              try {
+                                const res = await fetch(`/api/admin/users/${u.id}/password`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ password: newPass })
+                                });
+                                if (res.ok) alert("Password updated!");
+                                else {
+                                  const data = await res.json();
+                                  alert("Error: " + data.error);
+                                }
+                              } catch (e) {
+                                alert("Failed to update password.");
+                              } finally {
+                                setSubmitting(false);
+                              }
+                            }}
+                            className="text-xs font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors mr-4"
+                          >
+                            Reset Password
+                          </button>
+                          <span className="font-medium text-slate-500 text-sm whitespace-nowrap">
+                            {new Date(u.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                          </span>
                         </td>
                       </tr>
                     ))}

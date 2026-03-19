@@ -78,6 +78,35 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
+      {/* Navigation Header */}
+      <div className="bg-slate-900 text-white py-4 shadow-lg shadow-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+          <div className="flex items-center gap-8">
+            <h2 className="text-xl font-black italic tracking-tighter">PrintFrenzy</h2>
+            <nav className="hidden md:flex gap-6 text-sm font-bold">
+              <a href="/dashboard" className="text-blue-400">Queue</a>
+              <a href="/admin/users" className="hover:text-blue-400 transition-colors">Staff</a>
+              <a href="/import" className="hover:text-blue-400 transition-colors">Wix Import</a>
+              <a href="/orders/new" className="hover:text-blue-400 transition-colors">Manual Order</a>
+            </nav>
+          </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => router.push('/settings')}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+            >
+              Settings
+            </button>
+            <button 
+              onClick={() => signOut()}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Search and Filter Bar */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

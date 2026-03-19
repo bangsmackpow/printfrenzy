@@ -156,10 +156,13 @@ export default function CSVImport() {
                   <p className="text-3xl font-black text-slate-800">{results.skipped}</p>
                   <p className="text-xs font-bold text-slate-400 mt-1">Check CSV Data</p>
                 </div>
-                <div className="col-span-2 bg-green-600 text-white p-4 rounded-2xl font-bold text-center flex items-center justify-center gap-2">
+                <a 
+                  href="/dashboard"
+                  className="col-span-2 bg-green-600 hover:bg-green-700 text-white p-4 rounded-2xl font-bold text-center flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Import Complete
-                </div>
+                  Import Complete: View Queue
+                </a>
               </div>
             )}
 
