@@ -1,1 +1,54 @@
-👕 PrintFrenzyHigh-Efficiency DTF Print Queue & Production ManagerPrintFrenzy is a specialized internal tool built for Built Networks, LLC (Creston, IA). It is designed to bridge the gap between e-commerce orders (Wix) and physical DTF (Direct to Film) production by providing a high-resolution, "printer-ready" visual queue.🎯 Original IntentThe goal of this application is to reduce the "clicks-to-print" ratio for shop operators.The Problem: Wix order exports provide low-resolution thumbnails and messy CSV data that is difficult for a printer operator to work from.The Solution: A centralized dashboard that auto-upscales Wix thumbnails to 400x400, handles manual "off-platform" orders via R2 image uploads, and logs exactly which staff member printed which design for accountability.🛠️ Tech Stack (The "Bleeding Edge" Build)This project intentionally uses a high-performance, serverless stack to keep overhead at zero:Framework: Next.js 16.1.7 (Turbopack enabled)Runtime: Cloudflare Pages (Edge Runtime)Database: Cloudflare D1 (SQL)Storage: Cloudflare R2 (S3-compatible storage for manual designs)Auth: Auth.js (v5 Beta) with Credentials ProviderStyling: Tailwind CSS🚧 Current Development Progress (As of March 17, 2026)✅ CompletedDatabase Schema: D1 tables for users, orders, and audit*logs are initialized.Auth Engine: Switched to @auth/nextjs (v5) to support Next.js 16 on the Edge.Wix Logic: Implemented wixUtils.ts to transform Wix image URLs into high-quality printer thumbnails.Production Queue: Dashboard grid built with "Optimistic UI" for marking orders as printed.R2 Integration: Signed URL logic implemented for secure browser-to-bucket uploads.⏳ In Progress / Critical FixesMiddleware Bouncer: Transitioned to a "Light Middleware" to avoid Node.js async_hooks errors on the Cloudflare Edge.Environment Sync: Migrating NEXTAUTH* variables to AUTH\_ variables to match v5 requirements.CORS: R2 bucket policy configured to allow printfrenzy.pages.dev and localhost:3000.📅 Next StepsWix CSV Mapper: Refine the POST /api/orders/import route to handle the specific column indices of the latest Wix "All Orders" export.Audit Reporting: Create an /admin/reports page to calculate "Prints per Staff Member" based on audit_logs.Manual Order UI: Finalize the /orders/new form with the R2 drag-and-drop uploader.🔑 Environment Variables RequiredAdd these to your Cloudflare Pages Settings:VariableDescriptionAUTH_SECRET32-character random string for JWT encryption.AUTH_URLhttps://printfrenzy.pages.dev/api/authDBD1 Database Binding.ACCOUNT_IDCloudflare Account ID (for R2 endpoint).R2_BUCKET_NAMEName of your R2 assets bucket.R2_ACCESS_KEY_IDS3-compatible Access Key.R2_SECRET_ACCESS_KEYS3-compatible Secret Key.NPM_CONFIG_LEGACY_PEER_DEPSSet to true (Required for Next.js 16/Auth v5 build).
+# 👕 PrintFrenzy
+
+**High-Efficiency DTF Print Queue & Production Manager**
+
+PrintFrenzy is a specialized internal tool built for Built Networks, LLC (Creston, IA). It is designed to bridge the gap between e-commerce orders (Wix) and physical DTF (Direct to Film) production by providing a high-resolution, "printer-ready" visual queue.
+
+---
+
+### 🎯 Pro-Production Workflow
+The goal of this application is to minimize the "clicks-to-print" ratio:
+- **Wix Grouping**: Automatic grouping of multiple items (shirts, hats, bags) from a single Wix order into one card.
+- **Smart Thumbnails**: Automatically transforms low-res Wix thumbnails into 400x400 "printer-ready" images via `wixUtils.ts`.
+- **Manual Orders**: Drag-and-drop design uploads to Cloudflare R2 for off-platform jobs.
+- **Accountability**: Real-time logging of exactly which staff member printed which design via the `audit_logs`.
+
+### 🔐 Security & Management
+Protecting the production data and team access:
+- **Password Management**: Self-service user resets and admin-initiated password resets for all staff.
+- **Destructive Safety**: "Clear All Orders" requires an Admin password re-prompt to confirm the system wipe.
+- **Individual Cleanup**: Admins can delete specific orders or entire Wix groups directly from the queue.
+
+### 🛠️ Tech Stack (The "Bleeding Edge" Build)
+- **Framework**: Next.js 16.1.7 (Turbopack enabled)
+- **Runtime**: Cloudflare Pages (Edge Runtime)
+- **Database**: Cloudflare D1 (SQL)
+- **Storage**: Cloudflare R2 (S3-compatible)
+- **Auth**: Auth.js (v5 Beta)
+- **Styling**: Tailwind CSS
+
+---
+
+### 📅 Current Development Progress
+✅ **Completed**:
+- **Database Schema**: Unified tables for `users`, `orders`, and `audit_logs`.
+- **Auth Engine**: Switched to `@auth/nextjs (v5)` to support Next.js 16 on the Edge.
+- **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
+- **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
+- **Staff Control**: Admin panel for managing staff and resetting passwords.
+
+⏳ **In Progress / Next Phase**:
+- **Wix Direct API**: Migrating from CSV imports to a "Sync" button via the Wix Orders API.
+- **Audit Reporting**: Summary page for total prints per staff member.
+- **Webhook Integration**: Real-time order synchronization.
+
+---
+
+### 🔑 Environment Variables
+Add these to your Cloudflare Pages Dashboard:
+- `AUTH_SECRET`: Random 32-character string for JWT encryption.
+- `AUTH_URL`: `https://printfrenzy.pages.dev/api/auth`
+- `DB`: D1 Database Binding.
+- `BUCKET`: R2 Bucket Binding.
+- `ACCOUNT_ID`: Cloudflare Account ID.
+- `NPM_CONFIG_LEGACY_PEER_DEPS`: `true` (Required for Auth v5 build).
