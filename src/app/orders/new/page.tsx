@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface ManualItem {
   id: string;
@@ -38,7 +39,7 @@ export default function NewOrder() {
     }
   };
 
-  const updateItem = (id: string, field: keyof ManualItem, value: any) => {
+  const updateItem = <K extends keyof ManualItem>(id: string, field: K, value: ManualItem[K]) => {
     setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
 
@@ -146,7 +147,9 @@ export default function NewOrder() {
                         <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => setFile(e.target.files?.[0] || null)} />
                         {file ? (
                           <div className="flex items-center gap-4">
-                            <img src={URL.createObjectURL(file)} alt="Preview" className="h-20 w-20 object-contain rounded-lg shadow-sm" />
+                            <div className="relative h-20 w-20 shadow-sm rounded-lg overflow-hidden">
+                                <Image src={URL.createObjectURL(file)} alt="Preview" fill className="object-contain" unoptimized />
+                            </div>
                             <div className="text-left">
                                 <p className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]">{file.name}</p>
                                 <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null); }} className="text-[10px] text-red-500 font-bold uppercase mt-1 hover:underline relative z-20">Remove</button>
@@ -188,9 +191,9 @@ export default function NewOrder() {
                         }`}>
                             <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => updateItem(item.id, 'file', e.target.files?.[0] || null)} />
                             {item.file ? (
-                                <img src={URL.createObjectURL(item.file)} className="h-full w-full object-contain p-2" alt="p" />
+                                <Image src={URL.createObjectURL(item.file)} fill className="object-contain p-2" alt="p" unoptimized />
                             ) : item.image_url ? (
-                                <img src={item.image_url} className="h-full w-full object-contain p-2" alt="p" />
+                                <Image src={item.image_url} fill className="object-contain p-2" alt="p" unoptimized />
                             ) : (
                                 <span className="text-[20px] text-slate-200">🖼️</span>
                             )}

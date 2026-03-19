@@ -1,9 +1,8 @@
-"use client";
-
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { signOut } from "next-auth/react";
+import Image from 'next/image';
 
 interface Order {
   id: string;
@@ -27,13 +26,8 @@ function DashboardContent() {
   
   const searchParams = useSearchParams();
   const router = useRouter();
-  const error = searchParams.get('error');
 
-  useEffect(() => {
-    fetchOrders();
-  }, [activeStatus, searchQuery]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
       const url = new URL('/api/orders', window.location.origin);
@@ -50,7 +44,11 @@ function DashboardContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeStatus, searchQuery]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -150,8 +148,8 @@ function DashboardContent() {
                   onClick={() => setActiveStatus(tab.value)}
                   className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
                     activeStatus === tab.value
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                       ? 'bg-white text-blue-600 shadow-sm'
+                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {tab.label}
@@ -208,10 +206,12 @@ function DashboardContent() {
             {Object.entries(groupedOrders).map(([groupKey, items]) => (
               <div key={groupKey} className="group bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hover:shadow-xl transition-all duration-300">
                 <div className="aspect-square bg-slate-50 relative">
-                  <img 
+                  <Image 
                     src={getPrinterQualityImage(items[0].image_url)} 
                     alt="Order Thumb"
-                    className="w-full h-full object-contain p-4"
+                    fill
+                    className="object-contain p-4"
+                    unoptimized
                   />
                   <div className="absolute top-4 left-4 bg-white/90 px-3 py-1 rounded-full text-xs font-black border">
                     #{items[0].order_number || 'MANUAL'}
@@ -235,10 +235,12 @@ function DashboardContent() {
                         <div className="flex gap-3">
                           {/* Image Thumbnail with individual click */}
                           <div className="h-16 w-16 flex-shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden relative group/img z-10">
-                            <img 
+                            <Image 
                                 src={getPrinterQualityImage(item.image_url)} 
                                 alt={item.product_name}
-                                className="h-full w-full object-contain p-1"
+                                fill
+                                className="object-contain p-1"
+                                unoptimized
                             />
                             {/* 500x500 Hover Preview Overlay */}
                             <div className="absolute inset-0 z-20 opacity-0 group-hover/img:opacity-100 transition-opacity">
@@ -254,11 +256,15 @@ function DashboardContent() {
                                         <span>High-Res Master</span>
                                         <span>Click to Download Full</span>
                                     </div>
-                                    <img 
-                                        src={getPrinterQualityImage(item.image_url)} 
-                                        alt="Preview" 
-                                        className="w-full h-full object-contain"
-                                    />
+                                    <div className="relative w-full h-full">
+                                        <Image 
+                                            src={getPrinterQualityImage(item.image_url)} 
+                                            alt="Preview" 
+                                            fill
+                                            className="object-contain"
+                                            unoptimized
+                                        />
+                                    </div>
                                 </div>
                             </div>
                           </div>
@@ -316,9 +322,16 @@ function DashboardContent() {
                             : `id=${items[0].id}`;
                           try {
                             const res = await fetch(`/api/orders/delete?${query}`, { method: 'DELETE' });
-                            if (res.ok) fetchOrders();
-                            else alert("Delete failed.");
-                          } catch { alert("An error occurred."); }
+                            if (res.ok) {
+                                fetchOrders();
+                            } else {
+                                const data = await res.json();
+                                alert(`Delete failed: ${data.error || "Unknown server error"}`);
+                            }
+                          } catch (err: unknown) { 
+                            const e = err as Error;
+                            alert("An error occurred: " + e.message); 
+                          }
                         }
                       }}
                       className="p-3.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-2xl transition-all active:scale-95"
