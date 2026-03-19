@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS orders (
     variant TEXT,
     image_url TEXT NOT NULL, -- Wix URL or R2 URL
     status TEXT DEFAULT 'ORDERED', -- 'ORDERED', 'PRINTED', 'COMPLETED'
+    ordered_at TEXT, -- Original order date from CSV
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

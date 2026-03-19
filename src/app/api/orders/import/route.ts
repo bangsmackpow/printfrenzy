@@ -6,14 +6,20 @@ export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session) {
-    return NextResponse.json({ error: "Not Authenticated" }, { status: 401 });
-  }
+  // Allow authentication via session OR API Key (for email workers)
+  const apiKey = req.headers.get("x-api-key");
+  const validApiKey = process.env.API_IMPORT_KEY;
   
-  // For now, let Managers and Admins import
-  const role = (session.user as { role?: string })?.role;
-  if (role !== 'ADMIN' && role !== 'MANAGER') {
-    return NextResponse.json({ error: "Access Denied: Manager role required" }, { status: 403 });
+  let authorized = false;
+  if (session) {
+    const role = (session.user as { role?: string })?.role;
+    if (role === 'ADMIN' || role === 'MANAGER') authorized = true;
+  } else if (apiKey && validApiKey && apiKey === validApiKey) {
+    authorized = true;
+  }
+
+  if (!authorized) {
+    return NextResponse.json({ error: "Access Denied" }, { status: 403 });
   }
 
   try {
@@ -47,12 +53,13 @@ export async function POST(req: NextRequest) {
     let skipCount = 0;
 
     for (const record of records as Array<Record<string, string>>) {
-      // Mapping Wix Columns (Using common Wix export headers)
-      const orderNumber = record['Order ID'] || record['order_number'];
-      const customerName = record['Billing Name'] || record['customer_name'] || 'Unknown Customer';
-      const productName = record['Lineitem name'] || record['product_name'] || 'Unknown Product';
-      const variant = (record['Lineitem options'] || record['variant'] || '').trim();
-      const imageUrl = record['Lineitem image URL'] || record['image_url'];
+      // Mapping Wix Columns (Updated for latest Wix export format)
+      const orderNumber = record['Order number'] || record['Order ID'] || record['order_number'];
+      const customerName = record['Customer name'] || record['Billing Name'] || record['customer_name'] || 'Unknown Customer';
+      const productName = record['Product name'] || record['Lineitem name'] || record['product_name'] || 'Unknown Product';
+      const variant = (record['Product variant'] || record['Lineitem options'] || record['variant'] || '').trim();
+      const imageUrl = record['Product image'] || record['Lineitem image URL'] || record['image_url'];
+      const orderedAt = record['Date'] || record['ordered_at'];
 
       if (!imageUrl || !orderNumber) {
         skipCount++;
@@ -60,15 +67,16 @@ export async function POST(req: NextRequest) {
       }
 
       await db.prepare(`
-        INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'ORDERED')
+        INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'ORDERED')
       `).bind(
         crypto.randomUUID(),
         orderNumber,
         customerName,
         productName,
         variant,
-        imageUrl
+        imageUrl,
+        orderedAt
       ).run();
 
       importCount++;

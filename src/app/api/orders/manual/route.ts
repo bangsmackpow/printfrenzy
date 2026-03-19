@@ -14,15 +14,16 @@ export async function POST(req: NextRequest) {
 
   try {
     await db.prepare(`
-      INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'ORDERED')
+      INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'ORDERED')
     `).bind(
       orderId, 
       data.order_number, 
       data.customer_name, 
       data.product_name, 
       data.variant, 
-      data.image_url
+      data.image_url,
+      new Date().toISOString()
     ).run();
 
     return NextResponse.json({ success: true });

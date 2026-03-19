@@ -47,8 +47,10 @@ export default function NewOrder() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          order_number: formData.get("order_number"),
           customer_name: formData.get("customer_name"),
           product_name: formData.get("product_name"),
+          variant: formData.get("variant"),
           image_url: finalImageUrl,
         }),
       });
@@ -82,24 +84,45 @@ export default function NewOrder() {
         <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
           <form onSubmit={handleSubmit} className="p-8 space-y-6">
             <div className="grid grid-cols-1 gap-6">
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Customer Details</label>
-                <input 
-                  name="customer_name" 
-                  placeholder="Customer Name (e.g. John Smith)" 
-                  className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
-                  required 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Order # / Job Name</label>
+                  <input 
+                    name="order_number" 
+                    placeholder="e.g. 14781" 
+                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Customer Details</label>
+                  <input 
+                    name="customer_name" 
+                    placeholder="e.g. John Smith" 
+                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
+                    required 
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Product Info</label>
-                <input 
-                  name="product_name" 
-                  placeholder="What are we printing? (e.g. Red Hoodie)" 
-                  className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
-                  required 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Product Name</label>
+                  <input 
+                    name="product_name" 
+                    placeholder="e.g. Red Hoodie" 
+                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Variant / Size</label>
+                  <input 
+                    name="variant" 
+                    placeholder="e.g. Adult L" 
+                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
+                  />
+                </div>
               </div>
               
               <div className="relative group">
