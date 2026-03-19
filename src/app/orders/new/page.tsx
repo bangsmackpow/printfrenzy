@@ -8,6 +8,7 @@ interface ManualItem {
   product_name: string;
   variant: string;
   quantity: number;
+  customer_name?: string;
 }
 
 export default function NewOrder() {
@@ -66,7 +67,7 @@ export default function NewOrder() {
           order_number: orderNumber,
           customer_name: customerName,
           image_url: finalImageUrl,
-          items: items.map(({ product_name, variant, quantity }) => ({ product_name, variant, quantity }))
+          items: items.map(({ product_name, variant, quantity, customer_name }) => ({ product_name, variant, quantity, customer_name }))
         }),
       });
 
@@ -77,9 +78,10 @@ export default function NewOrder() {
 
       setStatus("success");
       setTimeout(() => router.push("/dashboard"), 1000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       setStatus("error");
-      setErrorMessage(err.message || "An unexpected error occurred");
+      setErrorMessage(error.message || "An unexpected error occurred");
     }
   };
 
@@ -176,7 +178,7 @@ export default function NewOrder() {
             </div>
 
             <div className="space-y-4">
-              {items.map((item, index) => (
+              {items.map((item) => (
                 <div key={item.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 relative group animate-in zoom-in-95 duration-200">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="md:col-span-2">
@@ -207,6 +209,15 @@ export default function NewOrder() {
                         min="1"
                         className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         required
+                      />
+                    </div>
+                    <div className="md:col-span-4">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Item Recipient (Optional)</label>
+                      <input 
+                        value={item.customer_name || ""}
+                        onChange={e => updateItem(item.id, 'customer_name', e.target.value)}
+                        placeholder="e.g. Krys Gerdes (Leave blank to use main customer name)"
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>

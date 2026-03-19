@@ -7,11 +7,12 @@ interface ManualOrderItem {
   product_name: string;
   variant: string;
   quantity: number;
+  customer_name?: string;
 }
 
 interface ManualOrderData {
   order_number: string;
-  customer_name: string;
+  customer_name: string; // Fallback
   image_url: string;
   items: ManualOrderItem[];
 }
@@ -33,13 +34,15 @@ export async function POST(req: NextRequest) {
   try {
     const stmts = items.map(item => {
       const id = crypto.randomUUID();
+      const finalCustomer = item.customer_name || customer_name || "Unknown Customer";
+      
       return db.prepare(`
         INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ORDERED')
       `).bind(
         id, 
         order_number, 
-        customer_name, 
+        finalCustomer, 
         item.product_name, 
         item.variant, 
         image_url,

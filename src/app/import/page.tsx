@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
 
 export default function CSVImport() {
   const [file, setFile] = useState<File | null>(null);
+  const [batchName, setBatchName] = useState("");
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [results, setResults] = useState<{ count: number; skipped: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -53,6 +53,7 @@ export default function CSVImport() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("batch_name", batchName);
 
     try {
       const res = await fetch("/api/orders/import", { 
@@ -67,6 +68,7 @@ export default function CSVImport() {
         setResults({ count: data.count, skipped: data.skipped });
         setFile(null); // Clear file after successful import
         if (fileInputRef.current) fileInputRef.current.value = "";
+        setBatchName(""); // Clear batch name after successful import
       } else {
         setStatus("error");
         setErrorMessage(data.error || "Failed to process the CSV file.");
@@ -88,6 +90,19 @@ export default function CSVImport() {
 
         <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
           <div className="p-10">
+            {/* Batch Name Input */}
+            <div className="mb-8">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Batch Order Name (Optional)</label>
+                <input 
+                    type="text"
+                    value={batchName}
+                    onChange={(e) => setBatchName(e.target.value)}
+                    placeholder="e.g. Thunder Soccer Team"
+                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all outline-none"
+                />
+                <p className="text-[10px] text-slate-400 font-medium mt-2 px-1 italic">This name will group all items in this CSV under one card in the queue.</p>
+            </div>
+
             {/* Drop Zone */}
             <div 
               onDragOver={handleDragOver}
@@ -205,7 +220,7 @@ export default function CSVImport() {
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="h-5 w-5 bg-white rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-black border border-slate-200 shadow-sm">3</span>
-                    Click 'Process' to add orders to the production queue.
+                    Click &apos;Process&apos; to add orders to the production queue.
                   </li>
                 </ul>
               </div>

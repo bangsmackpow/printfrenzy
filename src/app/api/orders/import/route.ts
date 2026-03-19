@@ -25,19 +25,15 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    const batchName = formData.get('batch_name') as string || "";
+
     if (!file) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
     const text = await file.text();
-    if (!text.includes(',')) {
-      return NextResponse.json({ error: "Invalid CSV format" }, { status: 400 });
-    }
-
     const db = (process.env as unknown as { DB: D1Database }).DB;
 
-    // Wix CSVs often have a preamble or specific header row. 
-    // We'll use csv-parse with 'columns: true' to map by name.
     const records = parse(text, {
       columns: true,
       skip_empty_lines: true,
@@ -53,8 +49,8 @@ export async function POST(req: NextRequest) {
     let skipCount = 0;
 
     for (const record of records as Array<Record<string, string>>) {
-      // Mapping Wix Columns (Updated for latest Wix export format)
-      const orderNumber = record['Order number'] || record['Order ID'] || record['order_number'];
+      // Mapping Wix Columns
+      const wixOrderNum = record['Order number'] || record['Order ID'] || record['order_number'];
       const customerName = record['Customer name'] || record['Billing Name'] || record['customer_name'] || 'Unknown Customer';
       const productName = record['Product name'] || record['Lineitem name'] || record['product_name'] || 'Unknown Product';
       const variant = (record['Product variant'] || record['Lineitem options'] || record['variant'] || '').trim();
@@ -62,17 +58,20 @@ export async function POST(req: NextRequest) {
       const orderedAt = record['Date'] || record['ordered_at'];
       const quantity = parseInt(record['Quantity'] || '1', 10) || 1;
 
-      if (!imageUrl || !orderNumber) {
+      if (!imageUrl) {
         skipCount++;
         continue;
       }
+
+      // Use user-provided batchName OR the Wix order number
+      const finalOrderNumber = batchName || wixOrderNum || "WIX-IMPORT";
 
       await db.prepare(`
         INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ORDERED')
       `).bind(
         crypto.randomUUID(),
-        orderNumber,
+        finalOrderNumber,
         customerName,
         productName,
         variant,
@@ -90,4 +89,4 @@ export async function POST(req: NextRequest) {
     console.error("CSV Import Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+}

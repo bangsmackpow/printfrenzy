@@ -70,20 +70,21 @@ function DashboardContent() {
     }
   };
 
-  const bulkUpdateStatus = async (orderNumber: string, customerName: string, newStatus: OrderStatus) => {
+  const bulkUpdateStatus = async (orderNumber: string, newStatus: OrderStatus) => {
     try {
       const res = await fetch(`/api/orders/bulk-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           order_number: orderNumber, 
-          customer_name: customerName, 
           status: newStatus 
         }),
       });
 
       if (res.ok) {
-        setOrders(orders.filter(o => !(o.order_number === orderNumber && o.customer_name === customerName)));
+        setOrders(orders.filter(o => o.order_number !== orderNumber));
+        // Simple refresh to reflect changes accurately
+        await fetchOrders();
       } else {
         alert("Failed to update group status.");
       }
@@ -94,9 +95,7 @@ function DashboardContent() {
 
   // Grouping logic for rendering
   const groupedOrders = orders.reduce((acc, order) => {
-    const key = order.order_number 
-      ? `${order.order_number}-${order.customer_name}` 
-      : order.id;
+    const key = order.order_number || order.id;
     if (!acc[key]) acc[key] = [];
     acc[key].push(order);
     return acc;
@@ -226,17 +225,20 @@ function DashboardContent() {
 
                 <div className="p-6 flex-grow flex flex-col">
                   <div className="mb-4">
-                    <h3 className="font-extrabold text-slate-800 truncate">{items[0].customer_name}</h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Multi-Item Shipments</p>
+                    <h3 className="font-extrabold text-slate-800 truncate">{items[0].order_number || 'Manual Order'}</h3>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Production Batch</p>
                   </div>
 
                   <div className="space-y-3 mb-6 flex-grow">
                     {items.map((item) => (
                       <div key={item.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 relative group/item">
-                        <p className="text-xs font-black text-slate-800 leading-tight mb-1">{item.product_name}</p>
-                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                        <div className="flex justify-between items-start mb-1">
+                            <p className="text-xs font-black text-slate-800 leading-tight flex-grow pr-2">{item.product_name}</p>
+                            <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600 text-[10px] font-black">x{item.quantity}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 italic">
                           <span>{item.variant}</span>
-                          <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600">x{item.quantity}</span>
+                          <span className="text-slate-400">{item.customer_name}</span>
                         </div>
                       </div>
                     ))}
@@ -245,32 +247,35 @@ function DashboardContent() {
                   <div className="flex gap-2 mt-auto">
                     {activeStatus === 'ORDERED' && (
                       <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, items[0].customer_name, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
                         className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                        Mark All Printed
+                        Batch Print
                       </button>
                     )}
+                    
                     {activeStatus === 'PRINTED' && (
                       <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, items[0].customer_name, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
-                        className="w-full bg-blue-600 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2"
                       >
-                        Complete Order
+                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        Batch Complete
                       </button>
                     )}
                     <button 
                       onClick={async () => {
-                        if (window.confirm(`Delete items for ${items[0].customer_name}?`)) {
+                        const label = items[0].order_number || items[0].customer_name;
+                        if (window.confirm(`Delete items for ${label}?`)) {
                           const query = items[0].order_number 
-                            ? `order_number=${items[0].order_number}&customer_name=${encodeURIComponent(items[0].customer_name)}` 
+                            ? `order_number=${items[0].order_number}` 
                             : `id=${items[0].id}`;
                           try {
                             const res = await fetch(`/api/orders/delete?${query}`, { method: 'DELETE' });
                             if (res.ok) fetchOrders();
                             else alert("Delete failed.");
-                          } catch (e) { alert("An error occurred."); }
+                          } catch { alert("An error occurred."); }
                         }
                       }}
                       className="p-3.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-2xl transition-all active:scale-95"
