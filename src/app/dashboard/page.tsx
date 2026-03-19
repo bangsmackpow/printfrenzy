@@ -118,6 +118,8 @@ function DashboardContent() {
             <nav className="hidden md:flex gap-6 text-sm font-bold">
               <a href="/dashboard" className="text-blue-400">Queue</a>
               <a href="/admin/users" className="hover:text-blue-400 transition-colors">Staff</a>
+              <a href="/admin/audit" className="hover:text-blue-400 transition-colors">Audit</a>
+              <a href="/admin/reports" className="hover:text-blue-400 transition-colors">Reports</a>
               <a href="/import" className="hover:text-blue-400 transition-colors">Wix Import</a>
               <a href="/orders/new" className="hover:text-blue-400 transition-colors">Manual Order</a>
             </nav>

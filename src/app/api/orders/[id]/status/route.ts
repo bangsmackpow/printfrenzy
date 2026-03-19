@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { archiveOrderToR2 } from "@/utils/backupUtils";
 
 export const runtime = 'edge';
 
@@ -17,6 +18,7 @@ export async function POST(
   
   const { status } = await req.json();
   const db = (process.env as unknown as { DB: D1Database }).DB;
+  const bucket = (process.env as unknown as { BUCKET: R2Bucket }).BUCKET;
   
   const userEmail = session.user?.email || "unknown"; 
 
@@ -26,6 +28,11 @@ export async function POST(
       db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")
         .bind(id, userEmail, `Status changed to ${status}`)
     ]);
+
+    // If order is COMPLETED, backup to R2
+    if (status === 'COMPLETED' && bucket) {
+      await archiveOrderToR2(db, bucket, id);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

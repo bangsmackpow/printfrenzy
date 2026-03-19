@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 
 interface User {
   id: string;
@@ -20,7 +20,7 @@ export default function UserAdmin() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   
-  const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN';
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -64,6 +64,7 @@ export default function UserAdmin() {
         setMessage({ text: errorData.error || "Failed to add user.", type: "error" });
       }
     } catch (err) {
+      console.error("Add user error:", err);
       setMessage({ text: "An error occurred. Please try again.", type: "error" });
     } finally {
       setSubmitting(false);
@@ -86,7 +87,10 @@ export default function UserAdmin() {
         <div className="mb-12 flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Staff Management</h1>
-            <p className="text-slate-500 mt-2 font-medium">Manage access and roles for the DTF production team.</p>
+            <div className="flex gap-4 mt-2">
+                <a href="/admin/audit" className="text-xs font-black uppercase text-blue-600 hover:underline">Audit Logs</a>
+                <a href="/admin/reports" className="text-xs font-black uppercase text-blue-600 hover:underline">Analytics</a>
+            </div>
           </div>
           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex gap-2">
             {isAdmin && (
@@ -112,7 +116,7 @@ export default function UserAdmin() {
                       const data = await res.json();
                       alert("Clear failed: " + (data.error || "Unknown error"));
                     }
-                  } catch (e) { alert("Failed to connect to server."); }
+                  } catch { alert("Failed to connect to server."); }
                   finally { setSubmitting(false); }
                 }}
                 className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
@@ -243,7 +247,7 @@ export default function UserAdmin() {
                                   const data = await res.json();
                                   alert("Error: " + data.error);
                                 }
-                              } catch (e) {
+                              } catch {
                                 alert("Failed to update password.");
                               } finally {
                                 setSubmitting(false);
