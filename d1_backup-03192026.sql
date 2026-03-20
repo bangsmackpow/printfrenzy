@@ -1,0 +1,10 @@
+PRAGMA defer_foreign_keys=TRUE;
+CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT UNIQUE, password_hash TEXT, role TEXT DEFAULT 'USER', created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO "users" ("id","email","password_hash","role","created_at") VALUES('1','admin@builtnetworks.com','$2a$10$.PZcyCzjs9UX5HwVsdRa1OpJGf7hKThfFYrc7fRJ1mhMZuigXIBk6','ADMIN','2026-03-17 18:45:15');
+INSERT INTO "users" ("id","email","password_hash","role","created_at") VALUES('7168853b-e105-46f9-860e-834c0e64c207','curtis@printfrenzy.dev','$2a$10$5Ji2dIXl/NGw7KP.1/DthOpCDn3X5WOIJoNqwG8Ygd8TGUJkeHLta','ADMIN','2026-03-17 23:35:30');
+INSERT INTO "users" ("id","email","password_hash","role","created_at") VALUES('aad9cb2e-9e3d-404c-bdaf-4b4f3259bad8','curtis@builtnetworks.com','$2a$10$ZU1Nv5T0NlzQcxtAe1GC3OMzimz6h.D0Y2uIGaK/a36pOhU5TfLDu','USER','2026-03-19 14:19:06');
+INSERT INTO "users" ("id","email","password_hash","role","created_at") VALUES('df967367-cc26-4ded-a26c-a976d67c6f18','ashli@printfrenzy.dev','$2a$10$Vg/vaMa61LnQKC17S/2/ROlA3aOodz4rEFaSpDDoT1XZZqrhz9g0i','MANAGER','2026-03-19 14:19:23');
+CREATE TABLE orders (id TEXT PRIMARY KEY, order_number TEXT, customer_name TEXT NOT NULL, product_name TEXT NOT NULL, variant TEXT, image_url TEXT NOT NULL, status TEXT DEFAULT 'ORDERED', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, quantity INTEGER DEFAULT 1, ordered_at TEXT);
+CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT, user_email TEXT, action TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(order_id) REFERENCES orders(id));
+DELETE FROM sqlite_sequence;
+INSERT INTO "sqlite_sequence" ("name","seq") VALUES('audit_logs',457);

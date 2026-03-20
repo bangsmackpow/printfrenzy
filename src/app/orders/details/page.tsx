@@ -15,10 +15,14 @@ interface Order {
   image_url: string;
   status: string;
   created_at: string;
+  notes?: string;
+  print_name?: string;
 }
 
 function DetailContent() {
   const [items, setItems] = useState<Order[]>([]);
+  const [batchNote, setBatchNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -32,6 +36,9 @@ function DetailContent() {
       if (res.ok) {
         const data = await res.json();
         setItems(data);
+        if (data.length > 0) {
+            setBatchNote(data[0].notes || "");
+        }
       }
     } catch (err) {
       console.error("Detail fetch error:", err);
@@ -44,8 +51,35 @@ function DetailContent() {
     fetchDetails();
   }, [fetchDetails]);
 
+  const saveBatchNote = async () => {
+    if (!orderNumber) return;
+    setSavingNote(true);
+    try {
+        const res = await fetch('/api/orders/update-notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_number: orderNumber, notes: batchNote })
+        });
+        if (res.ok) {
+            // Update local state to match
+            setItems(prev => prev.map(i => ({ ...i, notes: batchNote })));
+        }
+    } catch (err) {
+        console.error("Note save failed", err);
+    } finally {
+        setSavingNote(false);
+    }
+  };
+
   const updateStatus = async (orderId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'ORDERED' ? 'PRINTED' : 'COMPLETED';
+    let nextStatus = '';
+    switch(currentStatus) {
+        case 'RECEIVED': nextStatus = 'PRODUCTION'; break;
+        case 'PRODUCTION': nextStatus = 'PRINTED'; break;
+        case 'PRINTED': nextStatus = 'COMPLETED'; break;
+        default: return;
+    }
+
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: 'POST',
@@ -89,8 +123,8 @@ function DetailContent() {
   return (
     <div className="min-h-screen bg-[#f8fafc] py-12 px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-10 flex items-end justify-between border-b border-slate-200 pb-10">
-          <div>
+        <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between border-b border-slate-200 pb-10 gap-8">
+          <div className="flex-grow">
             <button onClick={() => router.back()} className="mb-4 text-xs font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center gap-2">
                 <span>←</span> Back to Queue
             </button>
@@ -99,6 +133,21 @@ function DetailContent() {
                 <span className="h-2 w-2 bg-green-500 rounded-full animate-ping"></span>
                 Detailed Production Breakdown ({items.length} items)
             </p>
+          </div>
+
+          <div className="w-full md:w-96 bg-white rounded-3xl p-6 border border-slate-200 shadow-xl shadow-slate-200/30 flex flex-col gap-3 group">
+              <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Internal Batch Notes</span>
+                  {savingNote && <span className="text-[8px] font-bold text-blue-600 animate-pulse uppercase">Saving...</span>}
+              </div>
+              <textarea 
+                value={batchNote} 
+                onChange={(e) => setBatchNote(e.target.value)}
+                onBlur={saveBatchNote}
+                placeholder="Mention special requests, rushes, or issues here..."
+                className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all h-24 resize-none"
+              />
+              <p className="text-[8px] font-bold text-slate-400 uppercase italic">Notes share across all production queues</p>
           </div>
         </div>
 
@@ -142,24 +191,47 @@ function DetailContent() {
                             <h3 className="text-lg font-black text-slate-900 leading-tight">{row.product_name}</h3>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-3">
                             <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
                                 <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Variant / Size</p>
-                                <p className="font-bold text-slate-800 uppercase text-xs truncate italic">{row.variant || 'N/A'}</p>
+                                <p className="font-bold text-slate-800 uppercase text-xs italic leading-relaxed whitespace-pre-wrap">{row.variant || 'N/A'}</p>
                             </div>
-                            <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800">
-                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Batch Qty</p>
+
+                            <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 flex flex-col gap-1">
+                                <p className="text-[9px] font-black uppercase text-amber-600 tracking-widest">Prints Name</p>
+                                <input 
+                                    type="text" 
+                                    placeholder="Add Name to Print..."
+                                    defaultValue={row.print_name || ""}
+                                    className="bg-transparent border-none p-0 text-sm font-black text-slate-800 placeholder:text-amber-300 outline-none w-full"
+                                    onBlur={async (e) => {
+                                        const val = e.target.value;
+                                        await fetch(`/api/orders/${row.id}/update`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ print_name: val })
+                                        });
+                                        setItems(prev => prev.map(item => item.id === row.id ? { ...item, print_name: val } : item));
+                                    }}
+                                />
+                            </div>
+
+                            <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800 flex justify-between items-center">
+                                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Master Qty</p>
                                 <p className="font-black text-white text-md uppercase">x{row.quantity}</p>
                             </div>
                         </div>
                         
                         <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
                             <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
-                                row.status === 'ORDERED' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                row.status === 'PRINTED' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                                'bg-green-50 text-green-600 border border-green-100'
+                                row.status === 'RECEIVED' ? 'bg-slate-50 text-slate-600 border border-slate-100' :
+                                row.status === 'ORDERING' ? 'bg-purple-50 text-purple-600 border border-purple-100' :
+                                row.status === 'PRINTING' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                row.status === 'PRODUCTION' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                row.status === 'COMPLETED' ? 'bg-green-50 text-green-600 border border-green-100' :
+                                'bg-slate-200 text-slate-500'
                             }`}>
-                                {row.status}
+                                {row.status === 'RECEIVED' ? 'NEW' : row.status}
                             </span>
                             
                             <div className="flex gap-2">
@@ -170,7 +242,7 @@ function DetailContent() {
                                 >
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
-                                {row.status !== 'COMPLETED' && (
+                                {row.status !== 'ARCHIVED' && (
                                     <button 
                                         onClick={() => updateStatus(row.id, row.status)}
                                         className="h-9 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2"

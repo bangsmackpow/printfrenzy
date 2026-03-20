@@ -16,14 +16,15 @@ interface Order {
   image_url: string;
   status: string;
   created_at: string;
+  notes?: string;
 }
 
-type OrderStatus = 'ORDERED' | 'PRINTED' | 'COMPLETED';
+type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
 function DashboardContent() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeStatus, setActiveStatus] = useState<OrderStatus>('ORDERED');
+  const [activeStatus, setActiveStatus] = useState<OrderStatus>('RECEIVED');
   const [searchQuery, setSearchQuery] = useState('');
   
   const router = useRouter();
@@ -51,7 +52,21 @@ function DashboardContent() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const getNextStatus = (current: OrderStatus): OrderStatus | null => {
+    switch(current) {
+        case 'RECEIVED': return 'ORDERING';
+        case 'ORDERING': return 'PRINTING';
+        case 'PRINTING': return 'PRODUCTION';
+        case 'PRODUCTION': return 'COMPLETED';
+        case 'COMPLETED': return 'ARCHIVED';
+        default: return null;
+    }
+  };
+
+  const updateStatus = async (orderId: string, currentStatus: OrderStatus) => {
+    const newStatus = getNextStatus(currentStatus);
+    if (!newStatus) return;
+
     try {
       const res = await fetch(`/api/orders/${orderId}/status`, {
         method: 'POST',
@@ -69,7 +84,10 @@ function DashboardContent() {
     }
   };
 
-  const bulkUpdateStatus = async (orderNumber: string, newStatus: OrderStatus) => {
+  const bulkUpdateStatus = async (orderNumber: string, currentStatus: OrderStatus) => {
+    const newStatus = getNextStatus(currentStatus);
+    if (!newStatus) return;
+
     try {
       const res = await fetch(`/api/orders/bulk-status`, {
         method: 'POST',
@@ -82,7 +100,6 @@ function DashboardContent() {
 
       if (res.ok) {
         setOrders(orders.filter(o => o.order_number !== orderNumber));
-        // Simple refresh to reflect changes accurately
         await fetchOrders();
       } else {
         alert("Failed to update group status.");
@@ -101,9 +118,12 @@ function DashboardContent() {
   }, {} as Record<string, Order[]>);
 
   const statusTabs: { label: string; value: OrderStatus; count?: number }[] = [
-    { label: 'Production Queue', value: 'ORDERED' },
-    { label: 'Printed / Waiting', value: 'PRINTED' },
+    { label: 'Received', value: 'RECEIVED' },
+    { label: 'Retrieve/Order', value: 'ORDERING' },
+    { label: 'Print Queue', value: 'PRINTING' },
+    { label: 'Production', value: 'PRODUCTION' },
     { label: 'Completed', value: 'COMPLETED' },
+    { label: 'Archive', value: 'ARCHIVED' },
   ];
 
   return (
@@ -232,14 +252,21 @@ function DashboardContent() {
                 </div>
 
                 <div className="p-6 flex-grow flex flex-col">
-                  <div className="mb-4">
-                    <h3 
-                        className="font-extrabold text-slate-800 truncate cursor-pointer hover:text-blue-600"
-                        onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
-                    >
-                        {items[0].order_number || 'Manual Order'}
-                    </h3>
-                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Production Batch</p>
+                  <div className="mb-4 flex justify-between items-start">
+                    <div>
+                        <h3 
+                            className="font-extrabold text-slate-800 truncate cursor-pointer hover:text-blue-600"
+                            onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
+                        >
+                            {items[0].order_number || 'Manual Order'}
+                        </h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Production Batch</p>
+                    </div>
+                    {items[0].notes && (
+                        <div className="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-amber-200 animate-pulse">
+                            📝 Note
+                        </div>
+                    )}
                   </div>
 
                   <div className="space-y-4 mb-6 flex-grow">
@@ -288,13 +315,13 @@ function DashboardContent() {
                                 <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600 text-[9px] font-black">x{item.quantity}</span>
                             </div>
                             <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase italic truncate">{item.customer_name}</p>
-                            <div className="flex items-center justify-between mt-2">
-                                <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold truncate max-w-[120px]">{item.variant}</span>
+                            <div className="flex items-start justify-between mt-2 gap-2">
+                                <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-1 rounded-md font-bold leading-tight flex-grow">{item.variant}</span>
                                 
                                 {/* Individual status update */}
                                 <button 
-                                  onClick={() => updateStatus(item.id, activeStatus === 'ORDERED' ? 'PRINTED' : 'COMPLETED')}
-                                  className="h-6 w-6 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all ml-2"
+                                  onClick={() => updateStatus(item.id, activeStatus)}
+                                  className="h-6 w-6 flex-shrink-0 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all"
                                   title="Push to Next Stage"
                                 >
                                   <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
@@ -314,25 +341,71 @@ function DashboardContent() {
                     )}
                   </div>
 
-                  <div className="flex gap-2 mt-auto">
-                    {activeStatus === 'ORDERED' && (
+                  <div className="flex gap-2 mt-auto pt-4 border-t border-slate-100">
+                    {activeStatus === 'RECEIVED' && (
                       <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTED') : updateStatus(items[0].id, 'PRINTED')}
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'RECEIVED') : updateStatus(items[0].id, 'RECEIVED')}
                         className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
                       >
-                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                        Move Batch
+                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Verify & Prep
+                      </button>
+                    )}
+
+                    {activeStatus === 'ORDERING' && (
+                      <button 
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'ORDERING') : updateStatus(items[0].id, 'ORDERING')}
+                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
+                      >
+                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                        Send to Print
+                      </button>
+                    )}
+
+                    {activeStatus === 'PRINTING' && (
+                      <div className="flex gap-2 w-full">
+                        <button 
+                            onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTING') : updateStatus(items[0].id, 'PRINTING')}
+                            className="flex-grow bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
+                        >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                            Print Finished
+                        </button>
+                        <a 
+                            href={`/orders/print?order_number=${encodeURIComponent(items[0].order_number || '')}`}
+                            target="_blank"
+                            className="bg-slate-100 hover:bg-slate-200 p-3.5 rounded-2xl flex items-center justify-center text-slate-600"
+                            title="Print Manifest"
+                        >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                        </a>
+                      </div>
+                    )}
+
+                    {activeStatus === 'PRODUCTION' && (
+                      <button 
+                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRODUCTION') : updateStatus(items[0].id, 'PRODUCTION')}
+                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
+                      >
+                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        Complete Order
                       </button>
                     )}
                     
-                    {activeStatus === 'PRINTED' && (
+                    {activeStatus === 'COMPLETED' && (
                       <button 
                         onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
                         className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
                       >
-                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Complete
+                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                        Archive (Picked Up)
                       </button>
+                    )}
+
+                    {activeStatus === 'ARCHIVED' && (
+                        <div className="w-full py-3.5 text-center text-xs font-black text-slate-400 border border-dashed border-slate-200 rounded-2xl uppercase tracking-widest">
+                            Official Archive
+                        </div>
                     )}
                     <button 
                       onClick={async () => {

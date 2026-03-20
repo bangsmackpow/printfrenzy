@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       
       return db.prepare(`
         INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ORDERED')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')
       `).bind(
         id, 
         order_number, 
