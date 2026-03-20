@@ -99,7 +99,8 @@ function DashboardContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           order_number: orderNumber, 
-          status: newStatus 
+          status: newStatus,
+          current_status: currentStatus
         }),
       });
 
@@ -325,13 +326,31 @@ function DashboardContent() {
                                 <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-1 rounded-md font-bold leading-tight flex-grow">{item.variant}</span>
                                 
                                 {/* Individual status update */}
-                                <button 
-                                  onClick={() => updateStatus(item.id, activeStatus)}
-                                  className="h-6 w-6 flex-shrink-0 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all"
-                                  title="Push to Next Stage"
-                                >
-                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                                </button>
+                                 <div className="flex gap-1">
+                                  <button 
+                                    onClick={() => updateStatus(item.id, activeStatus)}
+                                    className="h-6 w-6 flex-shrink-0 bg-white border border-slate-200 rounded-l-lg shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all border-r-0"
+                                    title="Push to Next Stage"
+                                  >
+                                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                  </button>
+                                  <div className="relative group/itemstatus">
+                                      <button className="h-6 px-1.5 bg-slate-50 border border-slate-200 rounded-r-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center text-[8px] font-black">
+                                          ^
+                                      </button>
+                                      <div className="absolute bottom-full right-0 mb-1 w-32 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover/itemstatus:opacity-100 group-hover/itemstatus:visible transition-all z-[100] overflow-hidden">
+                                          {statusTabs.map(tab => (
+                                              <button 
+                                                  key={tab.value}
+                                                  onClick={() => updateStatus(item.id, activeStatus, tab.value)}
+                                                  className="w-full text-left px-3 py-1.5 text-[9px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase whitespace-nowrap"
+                                              >
+                                                  {tab.label}
+                                              </button>
+                                          ))}
+                                      </div>
+                                  </div>
+                                </div>
                             </div>
                           </div>
                         </div>

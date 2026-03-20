@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { order_number, status: targetStatus, customer_name } = await req.json();
+  const { order_number, status: targetStatus, customer_name, current_status } = await req.json();
   if (!order_number) {
     return NextResponse.json({ error: "No order number provided" }, { status: 400 });
   }
@@ -28,6 +28,11 @@ export async function POST(req: NextRequest) {
     if (customer_name) {
       whereClause += " AND customer_name = ?";
       params.push(String(customer_name));
+    }
+
+    if (current_status) {
+      whereClause += " AND status = ?";
+      params.push(String(current_status));
     }
 
     // Role-based flow validation
