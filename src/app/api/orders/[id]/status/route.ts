@@ -48,7 +48,7 @@ export async function POST(
     ]);
 
     // If order is COMPLETED, backup to R2
-    if (status === 'COMPLETED' && bucket) {
+    if (targetStatus === 'COMPLETED' && bucket) {
       await archiveOrderToR2(db, bucket, id);
     }
 
