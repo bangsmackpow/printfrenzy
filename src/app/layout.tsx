@@ -9,11 +9,12 @@ import { Providers } from "@/components/Providers";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  const isPrintPage = pathname === "/orders/print";
 
-  if (isLoginPage) {
+  if (isLoginPage || isPrintPage) {
     return (
       <html lang="en">
-        <body>
+        <body className="bg-white">
           <Providers>{children}</Providers>
         </body>
       </html>

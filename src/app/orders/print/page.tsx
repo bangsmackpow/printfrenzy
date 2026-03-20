@@ -64,13 +64,13 @@ function PrintContent() {
         {items[0].notes && (
             <div className="bg-slate-100 p-6 rounded-2xl border-2 border-slate-900 border-dashed">
                 <p className="text-xs font-black uppercase mb-2">Internal Production Instructions</p>
-                <p className="text-lg font-bold italic">"{items[0].notes}"</p>
+                <p className="text-lg font-bold italic">&quot;{items[0].notes}&quot;</p>
             </div>
         )}
 
         <div className="space-y-10">
           {items.map((item, idx) => (
-            <div key={item.id} className="border-2 border-black rounded-3xl overflow-hidden page-break-inside-avoid">
+            <div key={item.id} className="border-2 border-black rounded-3xl overflow-hidden page-break">
               <div className="flex bg-black text-white px-6 py-3 justify-between items-center">
                 <span className="font-black text-xs uppercase tracking-widest">Part {idx + 1} of {items.length}</span>
                 <span className="font-black uppercase italic">{item.customer_name}</span>
@@ -153,8 +153,11 @@ function PrintContent() {
       <style jsx global>{`
         @media print {
           .no-print { display: none; }
-          .page-break-inside-avoid { page-break-inside: avoid; }
           body { background: white !important; }
+          .page-break {
+            page-break-after: always;
+            break-after: page;
+          }
         }
       `}</style>
     </div>
