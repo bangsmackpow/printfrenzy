@@ -129,10 +129,20 @@ function DetailContent() {
                 <span>←</span> Back to Queue
             </button>
             <h1 className="text-5xl font-black text-slate-900 tracking-tighter italic">Batch: {orderNumber}</h1>
-            <p className="text-slate-500 mt-2 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
-                <span className="h-2 w-2 bg-green-500 rounded-full animate-ping"></span>
-                Detailed Production Breakdown ({items.length} items)
-            </p>
+            <div className="flex items-center gap-4 mt-2">
+                <p className="text-slate-500 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
+                    <span className="h-2 w-2 bg-green-500 rounded-full animate-ping"></span>
+                    Detailed Production Breakdown ({items.length} items)
+                </p>
+                <a 
+                    href={`/orders/print?order_number=${encodeURIComponent(orderNumber || '')}`}
+                    target="_blank"
+                    className="bg-slate-900 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2"
+                >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                    Print Manifest
+                </a>
+            </div>
           </div>
 
           <div className="w-full md:w-96 bg-white rounded-3xl p-6 border border-slate-200 shadow-xl shadow-slate-200/30 flex flex-col gap-3 group">

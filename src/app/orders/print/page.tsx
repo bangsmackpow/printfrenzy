@@ -113,13 +113,28 @@ function PrintContent() {
                 </div>
               </div>
               
-              <div className="bg-slate-50 p-4 border-t-2 border-black flex justify-between px-8 text-[10px] font-bold uppercase">
-                  <div className="flex gap-8">
-                     <span className="flex items-center gap-2"><div className="h-3 w-3 border border-black"></div> QC Check</span>
-                     <span className="flex items-center gap-2"><div className="h-3 w-3 border border-black"></div> Layout Ok</span>
-                     <span className="flex items-center gap-2"><div className="h-3 w-3 border border-black"></div> Applied</span>
+              <div className="bg-slate-50 p-6 border-t-2 border-black grid grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                     <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Handwritten Workshop Notes</p>
+                     <div className="h-24 border-b border-slate-300 border-dashed"></div>
+                     <div className="h-2 border-b border-slate-300 border-dashed"></div>
                   </div>
-                  <span>Order ID: {item.id}</span>
+                  <div className="flex flex-col justify-between">
+                     <div className="flex gap-8 text-[11px] font-black uppercase">
+                        <span className="flex items-center gap-2"><div className="h-4 w-4 border-2 border-black"></div> Artwork Ok</span>
+                        <span className="flex items-center gap-2"><div className="h-4 w-4 border-2 border-black"></div> Printed</span>
+                        <span className="flex items-center gap-2"><div className="h-4 w-4 border-2 border-black"></div> Applied</span>
+                     </div>
+                     <div className="pt-4 border-t border-slate-200 mt-4 flex justify-between items-end">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Post-Production QC Sign-off:</p>
+                        <div className="w-40 border-b border-black"></div>
+                     </div>
+                  </div>
+              </div>
+              
+              <div className="bg-black text-white p-3 flex justify-between px-8 text-[9px] font-bold uppercase">
+                  <span>Part UUID: {item.id}</span>
+                  <span>Produced by: ____________________</span>
               </div>
             </div>
           ))}
