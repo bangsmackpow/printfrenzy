@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import Image from 'next/image';
 
+import { useSession } from "next-auth/react";
+
 interface Order {
   id: string;
   order_number: string;
@@ -19,8 +21,43 @@ interface Order {
   print_name?: string;
 }
 
+type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
+
 function DetailContent() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN' || (session?.user as { role?: string })?.role === 'MANAGER';
   const [items, setItems] = useState<Order[]>([]);
+  
+  const updateStatus = async (orderId: string, currentStatus: OrderStatus, targetStatus?: OrderStatus) => {
+    const nextStatuses: Record<OrderStatus, OrderStatus | null> = {
+      'RECEIVED': 'ORDERING',
+      'ORDERING': 'PRINTING',
+      'PRINTING': 'PRODUCTION',
+      'PRODUCTION': 'COMPLETED',
+      'COMPLETED': 'ARCHIVED',
+      'ARCHIVED': null
+    };
+
+    const newStatus = targetStatus || nextStatuses[currentStatus];
+    if (!newStatus) return;
+
+    try {
+      const res = await fetch(`/api/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        setItems(prev => prev.map(item => item.id === orderId ? { ...item, status: newStatus } : item));
+      } else {
+        const data = await res.json();
+        alert(`Failed to update status: ${data.error || 'Server error'}`);
+      }
+    } catch (err) {
+      console.error("Status update error:", err);
+    }
+  };
   const [batchNote, setBatchNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -68,29 +105,6 @@ function DetailContent() {
         console.error("Note save failed", err);
     } finally {
         setSavingNote(false);
-    }
-  };
-
-  const updateStatus = async (orderId: string, currentStatus: string) => {
-    let nextStatus = '';
-    switch(currentStatus) {
-        case 'RECEIVED': nextStatus = 'PRODUCTION'; break;
-        case 'PRODUCTION': nextStatus = 'PRINTED'; break;
-        case 'PRINTED': nextStatus = 'COMPLETED'; break;
-        default: return;
-    }
-
-    try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      if (res.ok) {
-        setItems(prev => prev.map(item => item.id === orderId ? { ...item, status: nextStatus } : item));
-      }
-    } catch (err) {
-      console.error("Status update error:", err);
     }
   };
 
@@ -243,8 +257,7 @@ function DetailContent() {
                             }`}>
                                 {row.status === 'RECEIVED' ? 'NEW' : row.status}
                             </span>
-                            
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                                 <button 
                                   onClick={() => deleteItem(row.id, row.product_name)}
                                   className="h-9 w-9 bg-red-50 text-red-500 rounded-xl flex items-center justify-center border border-red-100 hover:bg-red-500 hover:text-white transition-all"
@@ -252,14 +265,36 @@ function DetailContent() {
                                 >
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
+                                <div className="flex gap-1">
                                 {row.status !== 'ARCHIVED' && (
                                     <button 
-                                        onClick={() => updateStatus(row.id, row.status)}
-                                        className="h-9 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2"
+                                        onClick={() => updateStatus(row.id, row.status as OrderStatus)}
+                                        className="h-9 px-4 bg-slate-900 text-white rounded-l-xl rounded-r-md text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-2"
                                     >
                                         Push ➔
                                     </button>
                                 )}
+
+                                {isAdmin && (
+                                    <div className="relative group/status">
+                                        <button className="h-9 px-3 bg-slate-800 text-white rounded-r-xl rounded-l-md hover:bg-slate-700 flex items-center justify-center font-black">
+                                            ^
+                                        </button>
+                                        <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-30 overflow-hidden">
+                                            <div className="p-2 border-b border-slate-50 text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Jump to Stage</div>
+                                            {(['RECEIVED', 'ORDERING', 'PRINTING', 'PRODUCTION', 'COMPLETED', 'ARCHIVED'] as OrderStatus[]).map(st => (
+                                                <button 
+                                                    key={st}
+                                                    onClick={() => updateStatus(row.id, row.status as OrderStatus, st)}
+                                                    className="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
+                                                >
+                                                    {st}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                </div>
                             </div>
                         </div>
                     </div>

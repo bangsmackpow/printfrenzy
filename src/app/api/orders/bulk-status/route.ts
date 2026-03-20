@@ -10,14 +10,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { order_number, status, customer_name } = await req.json();
+  const { order_number, status: targetStatus, customer_name } = await req.json();
   if (!order_number) {
     return NextResponse.json({ error: "No order number provided" }, { status: 400 });
   }
 
   const db = (process.env as unknown as { DB: D1Database }).DB;
   const bucket = (process.env as unknown as { BUCKET: R2Bucket }).BUCKET;
-  const userEmail = session.user?.email || "unknown";
+  const user = session.user as { email: string; role: string };
+  const isAdmin = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const userEmail = user.email || "unknown";
 
   try {
     let whereClause = "WHERE order_number = ?";
@@ -28,22 +30,43 @@ export async function POST(req: NextRequest) {
       params.push(String(customer_name));
     }
 
+    // Role-based flow validation
+    if (!isAdmin) {
+      const currentOrder = await db.prepare(`SELECT status FROM orders ${whereClause} LIMIT 1`)
+        .bind(...params)
+        .first<{ status: string }>();
+      
+      if (!currentOrder) return NextResponse.json({ error: "Order batch not found" }, { status: 404 });
+
+      const workflow: Record<string, string> = {
+        'RECEIVED': 'ORDERING',
+        'ORDERING': 'PRINTING',
+        'PRINTING': 'PRODUCTION',
+        'PRODUCTION': 'COMPLETED',
+        'COMPLETED': 'ARCHIVED'
+      };
+
+      if (workflow[currentOrder.status] !== targetStatus) {
+        return NextResponse.json({ error: "Restricted: Regular users can only move items forward one stage." }, { status: 403 });
+      }
+    }
+
     const items = await db.prepare(`SELECT id FROM orders ${whereClause}`)
       .bind(...params)
       .all();
 
     const updateStmt = db.prepare(`UPDATE orders SET status = ? ${whereClause}`)
-      .bind(status, ...params);
+      .bind(targetStatus, ...params);
 
     const auditStmts = items.results.map((item) => 
       db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")
-        .bind(String(item.id), userEmail, `Group Status change: ${status}`)
+        .bind(String(item.id), userEmail, `Group Status change: ${targetStatus}`)
     );
 
     await db.batch([updateStmt, ...auditStmts]);
 
     // Archive all items to R2 if completed
-    if (status === 'COMPLETED' && bucket) {
+    if (targetStatus === 'COMPLETED' && bucket) {
       for (const item of items.results) {
         await archiveOrderToR2(db, bucket, String(item.id));
       }

@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
-import { signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import Image from 'next/image';
 
 interface Order {
@@ -17,11 +17,15 @@ interface Order {
   status: string;
   created_at: string;
   notes?: string;
+  print_name?: string;
 }
 
 type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
 function DashboardContent() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN' || (session?.user as { role?: string })?.role === 'MANAGER';
+  
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState<OrderStatus>('RECEIVED');
@@ -63,8 +67,8 @@ function DashboardContent() {
     }
   };
 
-  const updateStatus = async (orderId: string, currentStatus: OrderStatus) => {
-    const newStatus = getNextStatus(currentStatus);
+  const updateStatus = async (orderId: string, currentStatus: OrderStatus, targetStatus?: OrderStatus) => {
+    const newStatus = targetStatus || getNextStatus(currentStatus);
     if (!newStatus) return;
 
     try {
@@ -77,15 +81,16 @@ function DashboardContent() {
       if (res.ok) {
         setOrders(orders.filter(o => o.id !== orderId));
       } else {
-        alert("Failed to update status.");
+        const data = await res.json();
+        alert(`Failed to update status: ${data.error || 'Server error'}`);
       }
     } catch (err) {
       console.error("Status update error:", err);
     }
   };
 
-  const bulkUpdateStatus = async (orderNumber: string, currentStatus: OrderStatus) => {
-    const newStatus = getNextStatus(currentStatus);
+  const bulkUpdateStatus = async (orderNumber: string, currentStatus: OrderStatus, targetStatus?: OrderStatus) => {
+    const newStatus = targetStatus || getNextStatus(currentStatus);
     if (!newStatus) return;
 
     try {
@@ -102,7 +107,8 @@ function DashboardContent() {
         setOrders(orders.filter(o => o.order_number !== orderNumber));
         await fetchOrders();
       } else {
-        alert("Failed to update group status.");
+        const data = await res.json();
+        alert(`Failed to update group status: ${data.error || 'Server error'}`);
       }
     } catch (err) {
       console.error("Bulk status update error:", err);
@@ -341,65 +347,52 @@ function DashboardContent() {
                     )}
                   </div>
 
-                  <div className="flex gap-2 mt-auto pt-4 border-t border-slate-100">
-                    {activeStatus === 'RECEIVED' && (
-                      <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'RECEIVED') : updateStatus(items[0].id, 'RECEIVED')}
-                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
-                      >
-                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        Verify & Prep
-                      </button>
-                    )}
+                  <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-slate-100">
+                    <div className="flex gap-1">
+                        {activeStatus !== 'ARCHIVED' && (
+                            <button 
+                                onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, activeStatus) : updateStatus(items[0].id, activeStatus)}
+                                className="flex-grow bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-l-2xl rounded-r-md transition-all flex items-center justify-center gap-2 text-sm"
+                            >
+                                {activeStatus === 'RECEIVED' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Verify & Prep</>}
+                                {activeStatus === 'ORDERING' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg> Send to Print</>}
+                                {activeStatus === 'PRINTING' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg> Print Finished</>}
+                                {activeStatus === 'PRODUCTION' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Complete Order</>}
+                                {activeStatus === 'COMPLETED' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> Archive Order</>}
+                            </button>
+                        )}
 
-                    {activeStatus === 'ORDERING' && (
-                      <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'ORDERING') : updateStatus(items[0].id, 'ORDERING')}
-                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
-                      >
-                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                        Send to Print
-                      </button>
-                    )}
+                        {isAdmin && (
+                            <div className="relative group/menu">
+                                <button className="h-full px-3 bg-slate-800 text-white rounded-r-2xl rounded-l-md hover:bg-slate-700 flex items-center justify-center font-black">
+                                    ^
+                                </button>
+                                <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden">
+                                    <div className="p-2 border-b border-slate-50 text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Jump to Stage</div>
+                                    {statusTabs.map(tab => (
+                                        <button 
+                                            key={tab.value}
+                                            onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, activeStatus, tab.value) : updateStatus(items[0].id, activeStatus, tab.value)}
+                                            className="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {activeStatus === 'PRINTING' && (
-                      <div className="flex gap-2 w-full">
-                        <button 
-                            onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRINTING') : updateStatus(items[0].id, 'PRINTING')}
-                            className="flex-grow bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
-                        >
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                            Print Finished
-                        </button>
                         <a 
                             href={`/orders/print?order_number=${encodeURIComponent(items[0].order_number || '')}`}
                             target="_blank"
-                            className="bg-slate-100 hover:bg-slate-200 p-3.5 rounded-2xl flex items-center justify-center text-slate-600"
+                            className="bg-slate-100 hover:bg-slate-200 py-2.5 rounded-xl flex items-center justify-center text-slate-600 text-[10px] font-black uppercase tracking-widest gap-2"
                             title="Print Manifest"
                         >
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                            Generate Printer Manifest
                         </a>
-                      </div>
-                    )}
-
-                    {activeStatus === 'PRODUCTION' && (
-                      <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'PRODUCTION') : updateStatus(items[0].id, 'PRODUCTION')}
-                        className="w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
-                      >
-                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Complete Order
-                      </button>
-                    )}
-                    
-                    {activeStatus === 'COMPLETED' && (
-                      <button 
-                        onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, 'COMPLETED') : updateStatus(items[0].id, 'COMPLETED')}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm"
-                      >
-                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                        Archive (Picked Up)
-                      </button>
                     )}
 
                     {activeStatus === 'ARCHIVED' && (

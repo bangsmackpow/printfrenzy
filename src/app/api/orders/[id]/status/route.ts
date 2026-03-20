@@ -16,17 +16,35 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   
-  const { status } = await req.json();
+  const { status: targetStatus } = await req.json();
   const db = (process.env as unknown as { DB: D1Database }).DB;
   const bucket = (process.env as unknown as { BUCKET: R2Bucket }).BUCKET;
-  
-  const userEmail = session.user?.email || "unknown"; 
+  const user = session.user as { email: string; role: string };
+  const isAdmin = user.role === 'ADMIN' || user.role === 'MANAGER';
 
   try {
+    // If not admin, verify this is a "forward" move
+    if (!isAdmin) {
+      const currentOrder = await db.prepare("SELECT status FROM orders WHERE id = ?").bind(id).first<{ status: string }>();
+      if (!currentOrder) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      
+      const workflow: Record<string, string> = {
+        'RECEIVED': 'ORDERING',
+        'ORDERING': 'PRINTING',
+        'PRINTING': 'PRODUCTION',
+        'PRODUCTION': 'COMPLETED',
+        'COMPLETED': 'ARCHIVED'
+      };
+
+      if (workflow[currentOrder.status] !== targetStatus) {
+        return NextResponse.json({ error: "Restricted: Regular users can only move items forward one stage." }, { status: 403 });
+      }
+    }
+
     await db.batch([
-      db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id),
+      db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(targetStatus, id),
       db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")
-        .bind(id, userEmail, `Status changed to ${status}`)
+        .bind(id, user.email || "unknown", `Status changed to ${targetStatus}`)
     ]);
 
     // If order is COMPLETED, backup to R2
