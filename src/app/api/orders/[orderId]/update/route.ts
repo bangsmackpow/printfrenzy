@@ -3,13 +3,12 @@ import { auth } from "@/auth";
 
 export const runtime = 'edge';
 
-export async function POST(req: NextRequest, { params }: { params: { orderId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
+  const { orderId } = await params;
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
-
-  const { orderId } = params;
   const body = await req.json();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
