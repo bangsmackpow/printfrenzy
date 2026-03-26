@@ -8,9 +8,28 @@ function parseCSV(text: string) {
   const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
   if (lines.length === 0) return [];
   
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const parseLine = (line: string) => {
+    const result = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(cur.trim().replace(/^"|"$/g, ''));
+            cur = "";
+        } else {
+            cur += char;
+        }
+    }
+    result.push(cur.trim().replace(/^"|"$/g, ''));
+    return result;
+  };
+
+  const headers = parseLine(lines[0]);
   return lines.slice(1).map(line => {
-    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const values = parseLine(line);
     const record: Record<string, string> = {};
     headers.forEach((header, i) => {
       record[header] = values[i] || "";
