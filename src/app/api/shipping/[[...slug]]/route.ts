@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       });
       const transaction = await tRes.json() as { status: string; tracking_number: string; label_url: string };
       
-      if (transaction.status !== 'SUCCESS') return NextResponse.json({ error: "Purchase failed" }, { status: 400 });
+      if (transaction.status !== 'SUCCESS') return NextResponse.json({ error: "Purchase failed", details: transaction }, { status: 400 });
 
       await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(crypto.randomUUID(), finalOrderNumber, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();

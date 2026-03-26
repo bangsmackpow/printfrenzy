@@ -20,7 +20,7 @@ interface Shipment {
 interface Rate {
   object_id: string;
   provider: string;
-  servicelevel: { name: string };
+  servicelevel: { name: string, token: string };
   amount: string;
   currency: string;
   duration_terms: string;
@@ -44,8 +44,13 @@ export default function ShippingPage() {
     street: '',
     city: '',
     state: '',
-    zip: ''
+    zip: '',
+    weight: '7',
+    length: '12',
+    width: '11',
+    height: '2'
   });
+  const [showAllRates, setShowAllRates] = useState(false);
 
   const fetchShipments = useCallback(async () => {
     setLoading(true);
@@ -84,8 +89,15 @@ export default function ShippingPage() {
         });
         const data = await res.json();
         if (res.ok) {
-            setRates(data.rates || []);
-            if (data.rates?.length > 0) setSelectedRateId(data.rates[0].object_id);
+            const sorted = (data.rates || []).sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount));
+            setRates(sorted);
+            const gaRate = sorted.find((r: Rate) => 
+                r.servicelevel.token === 'usps_ground_advantage' || 
+                r.servicelevel.name.toLowerCase().includes("ground advantage")
+            );
+            if (gaRate) setSelectedRateId(gaRate.object_id);
+            else if (sorted.length > 0) setSelectedRateId(sorted[0].object_id);
+            setShowAllRates(false);
         } else {
             setFormError(data.error || "Failed to fetch rates");
         }
@@ -111,12 +123,17 @@ export default function ShippingPage() {
         const data = await res.json();
         if (res.ok) {
             setShowForm(false);
-            setFormData({ order_number: '', customer_name: '', street: '', city: '', state: '', zip: '' });
+            setFormData({ 
+                order_number: '', customer_name: '', street: '', city: '', state: '', zip: '',
+                weight: '7', length: '12', width: '11', height: '2'
+            });
             setRates([]);
             fetchShipments();
             if (data.label_url) window.open(data.label_url, '_blank');
         } else {
-            setFormError(data.error || "Purchase failed");
+            console.error("Purchase Error Details:", data.details);
+            const detailMsg = data.details?.messages?.[0]?.text || data.details?.message || "";
+            setFormError(data.error + (detailMsg ? `: ${detailMsg}` : ""));
         }
     } catch (err: unknown) {
         const error = err as Error;
@@ -196,6 +213,7 @@ export default function ShippingPage() {
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Street Address</label>
                       <input type="text" required value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase" placeholder="123 MAIN ST" />
                   </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">City</label>
@@ -210,23 +228,59 @@ export default function ShippingPage() {
                           <input type="text" required value={formData.zip} onChange={e => setFormData({...formData, zip: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center" placeholder="50801" />
                       </div>
                   </div>
-                  
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-slate-50">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Weight (oz)</label>
+                          <input type="number" step="0.1" required value={formData.weight} onChange={e => setFormData({...formData, weight: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono" placeholder="7" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">L (in)</label>
+                          <input type="number" required value={formData.length} onChange={e => setFormData({...formData, length: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono" placeholder="12" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">W (in)</label>
+                          <input type="number" required value={formData.width} onChange={e => setFormData({...formData, width: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono" placeholder="11" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">H (in)</label>
+                          <input type="number" required value={formData.height} onChange={e => setFormData({...formData, height: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono" placeholder="2" />
+                      </div>
+                  </div>
+
                   {rates.length > 0 && (
                       <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 animate-in slide-in-from-top-2">
-                          <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest ml-1 mb-4 block">Select USPS Shipping Method</label>
                           <div className="space-y-3">
-                              {rates.map(rate => (
+                              {rates
+                                .filter((r) => {
+                                    if (showAllRates) return true;
+                                    const isGA = r.servicelevel.token === 'usps_ground_advantage' || r.servicelevel.name.toLowerCase().includes("ground advantage");
+                                    const hasGA = rates.some(r2 => r2.servicelevel.token === 'usps_ground_advantage' || r2.servicelevel.name.toLowerCase().includes("ground advantage"));
+                                    if (!hasGA) return true;
+                                    const gaAmount = parseFloat(rates.find(r2 => r2.servicelevel.token === 'usps_ground_advantage' || r2.servicelevel.name.toLowerCase().includes("ground advantage"))?.amount || "999");
+                                    return isGA || parseFloat(r.amount) < gaAmount;
+                                })
+                                .map(rate => (
                                   <label key={rate.object_id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${selectedRateId === rate.object_id ? 'bg-white border-blue-600 shadow-md' : 'bg-transparent border-transparent hover:border-slate-200'}`}>
                                       <div className="flex items-center gap-4">
                                           <input type="radio" name="rate" checked={selectedRateId === rate.object_id} onChange={() => setSelectedRateId(rate.object_id)} className="w-4 h-4 text-blue-600" />
                                           <div>
-                                              <p className="font-black text-sm text-slate-900 italic uppercase">{rate.servicelevel.name}</p>
+                                              <p className="font-black text-sm text-slate-900 italic uppercase">
+                                                  <span className="text-blue-600 mr-2">{rate.provider}</span>
+                                                  {rate.servicelevel.name}
+                                              </p>
                                               <p className="text-[10px] font-bold text-slate-400 uppercase">{rate.duration_terms}</p>
                                           </div>
                                       </div>
                                       <p className="text-xl font-black text-slate-900">${rate.amount}</p>
                                   </label>
                               ))}
+
+                              {showAllRates ? (
+                                  <button type="button" onClick={() => setShowAllRates(false)} className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">Hide more options</button>
+                              ) : rates.length > 1 && (
+                                  <button type="button" onClick={() => setShowAllRates(true)} className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">Show more carrier options</button>
+                              )}
                           </div>
                           <button 
                             type="button"
@@ -248,17 +302,17 @@ export default function ShippingPage() {
                   
                   {!rates.length && (
                     <button 
-                        type="submit" 
-                        disabled={isGenerating}
-                        className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-3"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Fetching Rates...
-                            </>
-                        ) : 'Get USPS Shipping Rates'}
-                    </button>
+                         type="submit"
+                         disabled={isGenerating || !formData.customer_name || !formData.street || !formData.city || !formData.state || !formData.zip}
+                         className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-3"
+                     >
+                         {isGenerating ? (
+                             <>
+                                 <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                 Fetching Rates...
+                             </>
+                         ) : 'Get USPS Shipping Rates'}
+                     </button>
                   )}
               </form>
           </div>

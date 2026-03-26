@@ -47,6 +47,7 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
     const [error, setError] = useState("");
     const [rates, setRates] = useState<Rate[]>([]);
     const [selectedRateId, setSelectedRateId] = useState<string>("");
+    const [showAllRates, setShowAllRates] = useState(false);
 
     useEffect(() => {
         fetch(`/api/shipping/status?order_number=${orderNumber}&customer_name=${encodeURIComponent(customerName)}`)
@@ -70,22 +71,15 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
             const data = await res.json();
             if (res.ok) {
                 if (data.rates && data.rates.length > 0) {
-                    const sortedAll = [...data.rates].sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount));
-                    const gaRate = sortedAll.find((r: Rate) => 
+                    const sorted = (data.rates || []).sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount));
+                    setRates(sorted);
+                    const gaRate = sorted.find((r: Rate) => 
                         r.servicelevel.token === 'usps_ground_advantage' || 
                         r.servicelevel.name.toLowerCase().includes("ground advantage")
                     );
-                    
-                    if (gaRate) {
-                        const filtered = sortedAll.filter((r: Rate) => 
-                            r.object_id === gaRate.object_id || parseFloat(r.amount) < parseFloat(gaRate.amount)
-                        );
-                        setRates(filtered);
-                        setSelectedRateId(gaRate.object_id);
-                    } else {
-                        setRates(sortedAll);
-                        setSelectedRateId(sortedAll[0].object_id);
-                    }
+                    if (gaRate) setSelectedRateId(gaRate.object_id);
+                    else if (sorted.length > 0) setSelectedRateId(sorted[0].object_id);
+                    setShowAllRates(false);
                 }
             } else {
                 setError(data.error || "Failed to fetch rates");
@@ -112,7 +106,9 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
                 setShipment(data);
                 setRates([]);
             } else {
-                setError(data.error || "Purchase failed");
+                console.error("Purchase Error Details:", data.details);
+                const detailMsg = data.details?.messages?.[0]?.text || data.details?.message || "";
+                setError(data.error + (detailMsg ? `: ${detailMsg}` : ""));
             }
         } catch (err: unknown) {
             setError((err as Error).message);
@@ -180,7 +176,16 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
             {rates.length > 0 && (
                 <div className="mt-6 space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2">
                     <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-3 ml-1">Available Shipping Methods</p>
-                    {rates.map(rate => (
+                    {rates
+                        .filter((r) => {
+                            if (showAllRates) return true;
+                            const isGA = r.servicelevel.token === 'usps_ground_advantage' || r.servicelevel.name.toLowerCase().includes("ground advantage");
+                            const hasGA = rates.some(r2 => r2.servicelevel.token === 'usps_ground_advantage' || r2.servicelevel.name.toLowerCase().includes("ground advantage"));
+                            if (!hasGA) return true;
+                            const gaAmount = parseFloat(rates.find(r2 => r2.servicelevel.token === 'usps_ground_advantage' || r2.servicelevel.name.toLowerCase().includes("ground advantage"))?.amount || "999");
+                            return isGA || parseFloat(r.amount) < gaAmount;
+                        })
+                        .map(rate => (
                         <label key={rate.object_id} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedRateId === rate.object_id ? 'bg-white border-blue-600 shadow-sm' : 'bg-transparent border-transparent hover:border-slate-200'}`}>
                             <div className="flex items-center gap-3">
                                 <input type="radio" name="order-rate" checked={selectedRateId === rate.object_id} onChange={() => setSelectedRateId(rate.object_id)} className="w-4 h-4 text-blue-600" />
@@ -195,6 +200,13 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
                             <p className="font-black text-slate-900 text-base">${rate.amount}</p>
                         </label>
                     ))}
+
+                    {showAllRates ? (
+                        <button type="button" onClick={() => setShowAllRates(false)} className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">Hide more options</button>
+                    ) : rates.length > 1 && (
+                        <button type="button" onClick={() => setShowAllRates(true)} className="w-full py-2 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-colors">Show more carrier options</button>
+                    )}
+
                     <button 
                         onClick={handlePurchaseRate} 
                         disabled={loading || !selectedRateId} 
