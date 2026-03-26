@@ -15,16 +15,26 @@ export function getPrinterQualityImage(url: string, highRes = false): string {
     }
   }
 
-  // 2. Surgical replacement of the sizing segment
-  // Targets: /fit/w_50,h_50,q_90/ -> /fill/w_1000,h_1000,al_c,q_95/
-  if (finalUrl.includes('wixstatic.com/media/')) {
+  // 2. Adjust size for existing static URLs (including those from CSV exports)
+  // We use a broader approach: if it has w_ or h_, we'll replace the entire sizing segment.
+  if (finalUrl.includes('wixstatic.com')) {
     const targetW = highRes ? 1500 : 1000;
     const targetH = highRes ? 1500 : 1000;
     const targetQ = highRes ? 100 : 95;
-    const segment = `fill/w_${targetW},h_${targetH},al_c,q_${targetQ}`;
+    const newSegment = `fill/w_${targetW},h_${targetH},al_c,q_${targetQ}`;
 
-    // Replace anything between /v1/ and the next / (which is where the sizing lives)
-    finalUrl = finalUrl.replace(/\/v1\/(fit|fill)\/[^\/]+(?=\/)/, `/v1/${segment}`);
+    // Match and replace: /v1/anything_here/ and handle the case where it might be slightly different.
+    // Wix URLs strictly follow the format: .../media/id/v1/SizingMethod/Dimensions/filename
+    // We capture from /v1/ to the end and then replace.
+    const parts = finalUrl.split('/v1/');
+    if (parts.length === 2) {
+      const remaining = parts[1].split('/');
+      if (remaining.length >= 2) {
+        // e.g. ["fit", "w_50,h_50,q_90", "media_file.jpg"]
+        const filename = remaining[remaining.length - 1];
+        return `${parts[0]}/v1/${newSegment}/${filename}`;
+      }
+    }
   }
 
   return finalUrl;
