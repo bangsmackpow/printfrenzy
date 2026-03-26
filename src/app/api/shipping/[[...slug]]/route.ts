@@ -63,9 +63,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         body: JSON.stringify({ address_from: senderAddress, address_to: toAddress, parcels: [parcel], async: false })
       });
       const shipment = await sRes.json();
-      const uspsRates = (shipment.rates || []).filter((r: { provider: string }) => r.provider === 'USPS');
+      const allRates = (shipment.rates || []);
       
-      return NextResponse.json({ rates: uspsRates });
+      return NextResponse.json({ rates: allRates });
     } catch (e: unknown) { 
       return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
     }

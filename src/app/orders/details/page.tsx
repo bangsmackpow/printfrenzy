@@ -122,7 +122,7 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
         <div className="bg-white border border-slate-200 p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 mt-4 overflow-hidden">
             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2">
                 <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                Purchase USPS Shipping Label
+                Purchase Shipping Label
             </p>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <input type="text" placeholder="Street Address" className="md:col-span-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300 uppercase" value={address.street} onChange={e => setAddress({...address, street: e.target.value})} />
@@ -135,13 +135,16 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
 
             {rates.length > 0 && (
                 <div className="mt-6 space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2">
-                    <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-3 ml-1">Available USPS Methods</p>
+                    <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-3 ml-1">Available Shipping Methods</p>
                     {rates.map(rate => (
                         <label key={rate.object_id} className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${selectedRateId === rate.object_id ? 'bg-white border-blue-600 shadow-sm' : 'bg-transparent border-transparent hover:border-slate-200'}`}>
                             <div className="flex items-center gap-3">
                                 <input type="radio" name="order-rate" checked={selectedRateId === rate.object_id} onChange={() => setSelectedRateId(rate.object_id)} className="w-4 h-4 text-blue-600" />
                                 <div>
-                                    <p className="font-black text-xs text-slate-900 uppercase italic leading-none mb-1">{rate.servicelevel.name}</p>
+                                    <p className="font-black text-xs text-slate-900 uppercase italic leading-none mb-1">
+                                        <span className="text-blue-600 mr-2">{rate.provider}</span>
+                                        {rate.servicelevel.name}
+                                    </p>
                                     <p className="text-[9px] font-bold text-slate-400 uppercase">{rate.duration_terms}</p>
                                 </div>
                             </div>
