@@ -152,7 +152,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+  const userRole = (session?.user as { role?: string })?.role;
+  if (!session || (userRole !== 'ADMIN' && userRole !== 'MANAGER')) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
