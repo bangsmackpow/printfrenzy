@@ -186,8 +186,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     const id = searchParams.get('id');
     const orderNumber = searchParams.get('order_number');
     try {
-      if (id) await db.prepare("DELETE FROM orders WHERE id = ?").bind(id).run();
-      else if (orderNumber) await db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber).run();
+      if (id) {
+        // Clear associated audit logs first
+        await db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id).run();
+        await db.prepare("DELETE FROM orders WHERE id = ?").bind(id).run();
+      } else if (orderNumber) {
+        // Clear all audit logs for orders in this batch
+        await db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber).run();
+        await db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber).run();
+      }
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
         const error = e as Error;
