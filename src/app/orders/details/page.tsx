@@ -25,7 +25,7 @@ type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLE
 interface Rate {
     object_id: string;
     provider: string;
-    servicelevel: { name: string };
+    servicelevel: { name: string, token: string };
     amount: string;
     currency: string;
     duration_terms: string;
