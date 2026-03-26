@@ -17,6 +17,15 @@ interface Shipment {
   created_at: string;
 }
 
+interface Rate {
+  object_id: string;
+  provider: string;
+  servicelevel: { name: string };
+  amount: string;
+  currency: string;
+  duration_terms: string;
+}
+
 export default function ShippingPage() {
   const { status: authStatus } = useSession();
   const router = useRouter();
@@ -27,6 +36,8 @@ export default function ShippingPage() {
   const [showForm, setShowForm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [formError, setFormError] = useState("");
+  const [rates, setRates] = useState<Rate[]>([]);
+  const [selectedRateId, setSelectedRateId] = useState<string>("");
   const [formData, setFormData] = useState({
     order_number: '',
     customer_name: '',
@@ -59,26 +70,53 @@ export default function ShippingPage() {
     }
   }, [authStatus, router, fetchShipments]);
 
-  const handleCreateShipment = async (e: React.FormEvent) => {
+  const handleGetRates = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsGenerating(true);
     setFormError("");
+    setRates([]);
 
     try {
-        const res = await fetch('/api/shipping/generate', {
+        const res = await fetch('/api/shipping/rates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
         });
         const data = await res.json();
         if (res.ok) {
+            setRates(data.rates || []);
+            if (data.rates?.length > 0) setSelectedRateId(data.rates[0].object_id);
+        } else {
+            setFormError(data.error || "Failed to fetch rates");
+        }
+    } catch (err: unknown) {
+        const error = err as Error;
+        setFormError(error.message);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
+  const handlePurchaseRate = async () => {
+    if (!selectedRateId) return;
+    setIsGenerating(true);
+    setFormError("");
+
+    try {
+        const res = await fetch('/api/shipping/purchase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...formData, rate_id: selectedRateId })
+        });
+        const data = await res.json();
+        if (res.ok) {
             setShowForm(false);
             setFormData({ order_number: '', customer_name: '', street: '', city: '', state: '', zip: '' });
+            setRates([]);
             fetchShipments();
-            // Open label in new tab
             if (data.label_url) window.open(data.label_url, '_blank');
         } else {
-            setFormError(data.error || "Failed to generate label");
+            setFormError(data.error || "Purchase failed");
         }
     } catch (err: unknown) {
         const error = err as Error;
@@ -109,7 +147,11 @@ export default function ShippingPage() {
         </div>
         <div className="flex gap-4">
             <button 
-                onClick={() => setShowForm(!showForm)}
+                onClick={() => {
+                    setShowForm(!showForm);
+                    setRates([]);
+                    setFormError("");
+                }}
                 className={`px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg flex items-center gap-3 ${
                     showForm ? 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-50' : 'bg-slate-900 text-white hover:bg-blue-600 shadow-blue-100'
                 }`}
@@ -139,7 +181,7 @@ export default function ShippingPage() {
                   <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
                   USPS Label Generator
               </h2>
-              <form onSubmit={handleCreateShipment} className="space-y-6">
+              <form onSubmit={handleGetRates} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Reference / Order # (Optional)</label>
@@ -169,20 +211,55 @@ export default function ShippingPage() {
                       </div>
                   </div>
                   
+                  {rates.length > 0 && (
+                      <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 animate-in slide-in-from-top-2">
+                          <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest ml-1 mb-4 block">Select USPS Shipping Method</label>
+                          <div className="space-y-3">
+                              {rates.map(rate => (
+                                  <label key={rate.object_id} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${selectedRateId === rate.object_id ? 'bg-white border-blue-600 shadow-md' : 'bg-transparent border-transparent hover:border-slate-200'}`}>
+                                      <div className="flex items-center gap-4">
+                                          <input type="radio" name="rate" checked={selectedRateId === rate.object_id} onChange={() => setSelectedRateId(rate.object_id)} className="w-4 h-4 text-blue-600" />
+                                          <div>
+                                              <p className="font-black text-sm text-slate-900 italic uppercase">{rate.servicelevel.name}</p>
+                                              <p className="text-[10px] font-bold text-slate-400 uppercase">{rate.duration_terms}</p>
+                                          </div>
+                                      </div>
+                                      <p className="text-xl font-black text-slate-900">${rate.amount}</p>
+                                  </label>
+                              ))}
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={handlePurchaseRate}
+                            disabled={isGenerating || !selectedRateId}
+                            className="w-full mt-6 py-5 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-3"
+                          >
+                                {isGenerating ? (
+                                    <>
+                                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Processing Purchase...
+                                    </>
+                                ) : 'Purchase Selected Label'}
+                          </button>
+                      </div>
+                  )}
+
                   {formError && <p className="text-red-500 text-[10px] font-black uppercase px-2">{formError}</p>}
                   
-                  <button 
-                    type="submit" 
-                    disabled={isGenerating}
-                    className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-3"
-                  >
-                    {isGenerating ? (
-                        <>
-                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Purchasing Label...
-                        </>
-                    ) : 'Generate & Purchase USPS Label'}
-                  </button>
+                  {!rates.length && (
+                    <button 
+                        type="submit" 
+                        disabled={isGenerating}
+                        className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Fetching Rates...
+                            </>
+                        ) : 'Get USPS Shipping Rates'}
+                    </button>
+                  )}
               </form>
           </div>
       )}
@@ -228,6 +305,14 @@ export default function ShippingPage() {
                   </td>
                   <td className="p-8 text-right">
                     <div className="flex gap-2 justify-end">
+                        <a 
+                            href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${s.tracking_number}`}
+                            target="_blank"
+                            className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 rounded-2xl transition-all group"
+                            title="Track Package"
+                        >
+                            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        </a>
                         <a 
                             href={s.label_url} 
                             target="_blank"

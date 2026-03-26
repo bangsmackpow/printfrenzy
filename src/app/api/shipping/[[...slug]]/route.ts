@@ -41,15 +41,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  // 1. POST /api/shipping/generate
-  if (slug?.[0] === 'generate') {
+  // 1. POST /api/shipping/rates
+  if (slug?.[0] === 'rates') {
     const SHIPPO_API_KEY = process.env.SHIPPO_API_KEY;
     if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Missing Shippo Key" }, { status: 500 });
 
     try {
       const body = await req.json();
-      const { order_number, customer_name, street, city, state, zip } = body;
-      const finalOrderNumber = order_number || 'MANUAL';
+      const { customer_name, street, city, state, zip } = body;
 
       const senderAddress = process.env.SHIPPO_SENDER_ADDRESS_JSON 
         ? JSON.parse(process.env.SHIPPO_SENDER_ADDRESS_JSON) 
@@ -58,26 +57,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const toAddress = { name: customer_name || "Customer", street1: street, city: city, state: state, zip: zip, country: "US" };
       const parcel = { length: "12", width: "10", height: "4", distance_unit: "in", weight: "16", mass_unit: "oz" };
 
-      // Create Shipment
       const sRes = await fetch('https://api.goshippo.com/shipments/', {
         method: 'POST',
         headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ address_from: senderAddress, address_to: toAddress, parcels: [parcel], async: false })
       });
       const shipment = await sRes.json();
-      const rates = shipment.rates;
-      if (!rates || rates.length === 0) return NextResponse.json({ error: "No rates" }, { status: 400 });
+      const uspsRates = (shipment.rates || []).filter((r: { provider: string }) => r.provider === 'USPS');
+      
+      return NextResponse.json({ rates: uspsRates });
+    } catch (e: unknown) { 
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
+  }
 
-      const uspsRates = rates.filter((r: { provider: string }) => r.provider === 'USPS');
-      const selectedRate = uspsRates.length > 0 ? uspsRates[0] : rates[0];
+  // 2. POST /api/shipping/purchase
+  if (slug?.[0] === 'purchase') {
+    const SHIPPO_API_KEY = process.env.SHIPPO_API_KEY;
+    if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Missing Shippo Key" }, { status: 500 });
 
-      // Purchase Label
+    try {
+      const body = await req.json();
+      const { rate_id, order_number, customer_name, street, city, state, zip } = body;
+      const finalOrderNumber = order_number || 'MANUAL';
+
       const tRes = await fetch('https://api.goshippo.com/transactions/', {
         method: 'POST',
         headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rate: selectedRate.object_id, label_file_type: "PDF", async: false })
+        body: JSON.stringify({ rate: rate_id, label_file_type: "PDF", async: false })
       });
       const transaction = await tRes.json() as { status: string; tracking_number: string; label_url: string };
+      
       if (transaction.status !== 'SUCCESS') return NextResponse.json({ error: "Purchase failed" }, { status: 400 });
 
       await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
@@ -85,8 +95,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
       return NextResponse.json({ success: true, tracking_number: transaction.tracking_number, label_url: transaction.label_url });
     } catch (e: unknown) { 
-        const error = e as Error;
-        return NextResponse.json({ error: error.message }, { status: 500 }); 
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
     }
   }
 
