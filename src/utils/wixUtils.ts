@@ -15,17 +15,16 @@ export function getPrinterQualityImage(url: string, highRes = false): string {
     }
   }
 
-  // 2. Adjust size for existing static URLs (including those from CSV exports)
-  if (finalUrl.includes('wixstatic.com')) {
+  // 2. Surgical replacement of the sizing segment
+  // Targets: /fit/w_50,h_50,q_90/ -> /fill/w_1000,h_1000,al_c,q_95/
+  if (finalUrl.includes('wixstatic.com/media/')) {
     const targetW = highRes ? 1500 : 1000;
     const targetH = highRes ? 1500 : 1000;
     const targetQ = highRes ? 100 : 95;
+    const segment = `fill/w_${targetW},h_${targetH},al_c,q_${targetQ}`;
 
-    return finalUrl
-      .replace(/\/fit\//g, '/fill/') // Prefer fill for consistent aspect ratios
-      .replace(/w_\d+/g, `w_${targetW}`)
-      .replace(/h_\d+/g, `h_${targetH}`)
-      .replace(/q_\d+/g, `q_${targetQ}`);
+    // Replace anything between /v1/ and the next / (which is where the sizing lives)
+    finalUrl = finalUrl.replace(/\/v1\/(fit|fill)\/[^\/]+(?=\/)/, `/v1/${segment}`);
   }
 
   return finalUrl;
