@@ -92,8 +92,8 @@ export default function ShippingPage() {
             const sorted = (data.rates || []).sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount));
             setRates(sorted);
             const gaRate = sorted.find((r: Rate) => 
-                r.servicelevel.token === 'usps_ground_advantage' || 
-                r.servicelevel.name.toLowerCase().includes("ground advantage")
+                r.servicelevel.token.includes('usps_ground') || 
+                (r.provider.toLowerCase() === 'usps' && r.servicelevel.name.toLowerCase().includes("ground"))
             );
             if (gaRate) setSelectedRateId(gaRate.object_id);
             else if (sorted.length > 0) setSelectedRateId(sorted[0].object_id);
@@ -254,10 +254,11 @@ export default function ShippingPage() {
                               {rates
                                 .filter((r) => {
                                     if (showAllRates) return true;
-                                    const isGA = r.servicelevel.token === 'usps_ground_advantage' || r.servicelevel.name.toLowerCase().includes("ground advantage");
-                                    const hasGA = rates.some(r2 => r2.servicelevel.token === 'usps_ground_advantage' || r2.servicelevel.name.toLowerCase().includes("ground advantage"));
+                                    const isGA = r.servicelevel.token.includes('usps_ground') || (r.provider.toLowerCase() === 'usps' && r.servicelevel.name.toLowerCase().includes("ground"));
+                                    const hasGA = rates.some(r2 => r2.servicelevel.token.includes('usps_ground') || (r2.provider.toLowerCase() === 'usps' && r2.servicelevel.name.toLowerCase().includes("ground")));
                                     if (!hasGA) return true;
-                                    const gaAmount = parseFloat(rates.find(r2 => r2.servicelevel.token === 'usps_ground_advantage' || r2.servicelevel.name.toLowerCase().includes("ground advantage"))?.amount || "999");
+                                    const gaRate = rates.find(r2 => r2.servicelevel.token.includes('usps_ground') || (r2.provider.toLowerCase() === 'usps' && r2.servicelevel.name.toLowerCase().includes("ground")));
+                                    const gaAmount = parseFloat(gaRate?.amount || "999");
                                     return isGA || parseFloat(r.amount) < gaAmount;
                                 })
                                 .map(rate => (
