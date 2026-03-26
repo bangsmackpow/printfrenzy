@@ -8,10 +8,10 @@ PrintFrenzy is a specialized internal tool built for Built Networks, LLC (Cresto
 
 ### 🎯 Pro-Production Workflow
 The goal of this application is to minimize the "clicks-to-print" ratio:
-- **Wix Grouping**: Automatic grouping of multiple items (shirts, hats, bags) from a single Wix order into one card.
-- **Smart Thumbnails**: Automatically transforms low-res Wix thumbnails into 400x400 "printer-ready" images via `wixUtils.ts`.
-- **Manual Orders**: Drag-and-drop design uploads to Cloudflare R2 for off-platform jobs.
-- **Accountability**: Real-time logging of exactly which staff member printed which design via the `audit_logs`.
+- **Wix Direct Sync**: Real-time order fetching via the "Sync Wix" button, eliminating the need for CSV imports.
+- **Auto-Image Uplifting**: Automatically transforms low-res Wix thumbnails into 1500px+ production-quality images via `wixUtils.ts`.
+- **Manual Orders**: Drag-and-drop design uploads directly to Cloudflare R2 for off-platform or custom jobs.
+- **Accountability**: Real-time logging of exactly which staff member moved which design through the production pipeline.
 
 ### 🔐 Security & Management
 Protecting the production data and team access:
@@ -35,14 +35,16 @@ Protecting the production data and team access:
 - **Auth Engine**: Switched to `@auth/nextjs (v5)` to support Next.js 16 on the Edge.
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
 - **Production Print Manifest**: A dedicated sidebar tab for generating global, high-resolution print manifests for all orders in the "PRINTING" stage.
-- **USPS Shipping Tool**: A standalone sidebar tool for generating and tracking USPS shipping labels for both internal orders and external shipments via Shippo API.
+- **USPS Shipping Tool**: A standalone sidebar tool for generating and tracking USPS shipping labels for both internal orders and external shipments via Shippo API. Ensures sender contact compliance and hides postage price on labels.
+- **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing.
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
+- **Production Print Manifest**: Dedicated sidebar view for generating high-resolution manifests and specialized urgent notes pages.
 
 ⏳ **In Progress / Next Phase**:
-- **Wix Direct API**: Migrating from CSV imports to a "Sync" button via the Wix Orders API.
+- **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.
 - **Audit Reporting**: Summary page for total prints per staff member.
-- **Webhook Integration**: Real-time order synchronization.
+- **Barcode Support**: Direct scanning of manifests to trigger movement through the production stages.
 
 ---
 
@@ -55,4 +57,6 @@ Add these to your Cloudflare Pages Dashboard:
 - `ACCOUNT_ID`: Cloudflare Account ID.
 - `NPM_CONFIG_LEGACY_PEER_DEPS`: `true` (Required for Auth v5 build).
 - `SHIPPO_API_KEY`: API Key for USPS shipping label generation.
-- `SHIPPO_SENDER_ADDRESS_JSON`: (Optional) JSON string of the default sender address.
+- `SHIPPO_SENDER_ADDRESS_JSON`: JSON string of the default sender address (requires email & phone).
+- `WIX_API_KEY`: Wix API Key (Direct API sync).
+- `WIX_SITE_ID`: Wix Site ID (Direct API sync).
