@@ -1,14 +1,32 @@
 export function getPrinterQualityImage(url: string, highRes = false): string {
   if (!url) return "/placeholder.png";
-  if (!url.includes('wixstatic.com')) return url; // Handle R2 uploads
 
-  // Robust regex for replacing dimensions in Wix URLs
-  // Handles comma-separated fit/fill dimensions like w_50,h_50
-  const size = highRes ? 'w_1000,h_1000' : 'w_500,h_500';
-  const q = highRes ? 'q_100' : 'q_90';
+  let finalUrl = url;
 
-  return url
-    .replace(/w_\d+/g, size.split(',')[0])
-    .replace(/h_\d+/g, size.split(',')[1])
-    .replace(/q_\d+/g, q);
+  // 1. Transform wix:image://v1/{hash}/{name}#originWidth=...
+  if (url.startsWith('wix:image://')) {
+    const parts = url.split('/');
+    if (parts.length >= 5) {
+      const hash = parts[4];
+      const filenameWithMeta = parts[parts.length - 1];
+      const filename = filenameWithMeta.split('#')[0];
+      const ext = filename.split('.').pop() || 'jpg';
+      finalUrl = `https://static.wixstatic.com/media/${hash}~mv2.${ext}/v1/fill/w_1200,h_1200,al_c,q_100/${filename}`;
+    }
+  }
+
+  // 2. Adjust size for existing static URLs (including those from CSV exports)
+  if (finalUrl.includes('wixstatic.com')) {
+    const targetW = highRes ? 1500 : 1000;
+    const targetH = highRes ? 1500 : 1000;
+    const targetQ = highRes ? 100 : 95;
+
+    return finalUrl
+      .replace(/\/fit\//g, '/fill/') // Prefer fill for consistent aspect ratios
+      .replace(/w_\d+/g, `w_${targetW}`)
+      .replace(/h_\d+/g, `h_${targetH}`)
+      .replace(/q_\d+/g, `q_${targetQ}`);
+  }
+
+  return finalUrl;
 }
