@@ -56,7 +56,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
       const senderAddress = process.env.SHIPPO_SENDER_ADDRESS_JSON 
         ? JSON.parse(process.env.SHIPPO_SENDER_ADDRESS_JSON) 
-        : { name: "Print Frenzy", street1: "123 Main St", city: "Creston", state: "IA", zip: "50801", country: "US" };
+        : { name: "Print Frenzy", street1: "123 Main St", city: "Creston", state: "IA", zip: "50801", country: "US", email: "curtis@printfrenzy.dev", phone: "6415551234" };
+
+      // Ensure email/phone exist (USPS requires them)
+      if (!senderAddress.email) senderAddress.email = "curtis@printfrenzy.dev";
+      if (!senderAddress.phone) senderAddress.phone = "6415551234";
 
       const toAddress = { name: customer_name || "Customer", street1: street, city: city, state: state, zip: zip, country: "US" };
       const parcel = { 

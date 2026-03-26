@@ -27,6 +27,7 @@ function DashboardContent() {
   const router = useRouter();
   const [items, setItems] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<OrderStatus | 'ALL'>('RECEIVED');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -43,6 +44,25 @@ function DashboardContent() {
       setLoading(false);
     }
   }, []);
+  
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/orders/sync', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Sync Complete!\nAdded: ${data.added}\nAlready exists: ${data.skipped}`);
+        fetchItems();
+      } else {
+        alert("Sync Failed: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+      alert("Sync failed to execute.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -141,6 +161,23 @@ function DashboardContent() {
         </div>
         
         <div className="flex gap-4 items-center">
+            <button 
+                onClick={handleSync} 
+                disabled={syncing}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-900 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+            >
+                {syncing ? (
+                    <>
+                        <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Syncing...
+                    </>
+                ) : (
+                    <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.582m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Sync Wix
+                    </>
+                )}
+            </button>
             <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 flex gap-1">
                 {(['RECEIVED', 'ORDERING', 'PRINTING', 'PRODUCTION', 'COMPLETED', 'ALL'] as const).map((s) => (
                     <button

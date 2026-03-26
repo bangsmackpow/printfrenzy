@@ -176,7 +176,79 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }
   }
 
-  // 6. POST /api/orders/manual
+  // 6. POST /api/orders/sync (Real-time Wix Direct API Sync)
+  if (slug?.[0] === 'sync') {
+    const WIX_API_KEY = process.env.WIX_API_KEY;
+    const WIX_SITE_ID = process.env.WIX_SITE_ID;
+
+    if (!WIX_API_KEY || !WIX_SITE_ID) {
+      return NextResponse.json({ error: "Missing WIX_API_KEY or WIX_SITE_ID in environment" }, { status: 500 });
+    }
+
+    try {
+        // Fetch last 20 paid orders from Wix
+        const wRes = await fetch('https://www.wixapis.com/stores/v2/orders/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': WIX_API_KEY,
+                'wix-site-id': WIX_SITE_ID,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: {
+                    filter: { "status": "PAID" },
+                    sort: [{ "field": "number", "order": "DESC" }],
+                    paging: { limit: 20 }
+                }
+            })
+        });
+
+        if (!wRes.ok) {
+            const errData = await wRes.json();
+            return NextResponse.json({ error: "Wix API Error", details: errData }, { status: wRes.status });
+        }
+
+        const { orders } = await wRes.json();
+        let addedCount = 0;
+        let skippedCount = 0;
+
+        for (const order of (orders || [])) {
+            const orderNumber = order.number.toString();
+            const customerName = (order.billingInfo?.address?.fullName || order.billingInfo?.contactDetails?.firstName + " " + order.billingInfo?.contactDetails?.lastName || "Unknown").toUpperCase();
+            
+            for (const item of (order.lineItems || [])) {
+                const productName = (item.name || "Product").toUpperCase();
+                const variant = (item.description || "").trim().toUpperCase();
+                const imageUrl = item.image; // Wix usually provides the wix:image:// URL here or a static one
+                const qty = item.quantity || 1;
+                const orderedAt = order._createdDate;
+
+                // Simple deduplication CHECK: Look for this exact order number and item name for this customer
+                // (Until we have a wix_item_id column, we use the composite of these fields)
+                const existing = await db.prepare("SELECT id FROM orders WHERE order_number = ? AND customer_name = ? AND product_name = ? AND variant = ? AND quantity = ?")
+                    .bind(orderNumber, customerName, productName, variant, qty).first();
+
+                if (existing) {
+                    skippedCount++;
+                    continue;
+                }
+
+                if (imageUrl) {
+                    await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
+                        .bind(crypto.randomUUID(), orderNumber, customerName, productName, variant, imageUrl, orderedAt, qty).run();
+                    addedCount++;
+                }
+            }
+        }
+
+        return NextResponse.json({ success: true, added: addedCount, skipped: skippedCount });
+    } catch (e: unknown) {
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  // 7. POST /api/orders/manual
   if (slug?.[0] === 'manual') {
     try {
       const { order_number, customer_name, product_name, variant, image_url, quantity } = await req.json();
