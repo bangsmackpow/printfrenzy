@@ -31,9 +31,11 @@ Protecting the production data and team access:
 
 ### 📅 Current Development Progress
 ✅ **Completed**:
-- **Database Schema**: Unified tables for `users`, `orders`, and `audit_logs`.
+- **Database Schema**: Unified tables for `users`, `orders`, and `audit_logs`. Added `shipments` table.
 - **Auth Engine**: Switched to `@auth/nextjs (v5)` to support Next.js 16 on the Edge.
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
+- **Production Print Manifest**: A dedicated sidebar tab for generating global, high-resolution print manifests for all orders in the "PRINTING" stage.
+- **USPS Shipping**: Direct integration with Shippo API for generating and tracking USPS shipping labels right from the order details page.
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
 
@@ -52,3 +54,5 @@ Add these to your Cloudflare Pages Dashboard:
 - `BUCKET`: R2 Bucket Binding.
 - `ACCOUNT_ID`: Cloudflare Account ID.
 - `NPM_CONFIG_LEGACY_PEER_DEPS`: `true` (Required for Auth v5 build).
+- `SHIPPO_API_KEY`: API Key for USPS shipping label generation.
+- `SHIPPO_SENDER_ADDRESS_JSON`: (Optional) JSON string of the default sender address.
