@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import Image from 'next/image';
@@ -207,25 +207,26 @@ function DetailContent() {
     }
   };
 
-  const fetchDetails = useCallback(async () => {
-    if (!orderNumber) return;
-    try {
-      const res = await fetch(`/api/orders/details?order_number=${encodeURIComponent(orderNumber)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data);
-        if (data.length > 0 && data[0].notes) {
-            setBatchNote(data[0].notes);
-        }
-      }
-    } catch (err) {
-      console.error("Fetch error:", err);
-    }
-  }, [orderNumber]);
-
   useEffect(() => {
-    fetchDetails();
-  }, [fetchDetails]);
+    let ignore = false;
+    async function startFetching() {
+        if (!orderNumber) return;
+        try {
+            const res = await fetch(`/api/orders/details?order_number=${encodeURIComponent(orderNumber)}`);
+            if (!ignore && res.ok) {
+                const data = await res.json();
+                setItems(data);
+                if (data.length > 0 && data[0].notes) {
+                    setBatchNote(data[0].notes);
+                }
+            }
+        } catch (err) {
+            console.error("Fetch error:", err);
+        }
+    }
+    startFetching();
+    return () => { ignore = true; };
+  }, [orderNumber]);
 
   const saveBatchNote = async () => {
     try {
