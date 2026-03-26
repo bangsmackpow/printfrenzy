@@ -7,10 +7,10 @@ export const runtime = "experimental-edge";
 export default async function proxy(request: NextRequest) {
   const session = await auth();
   const isLoginPage = request.nextUrl.pathname === "/login";
-  const isApiAuth = request.nextUrl.pathname.startsWith("/api/auth");
-  const isDebugAuth = request.nextUrl.pathname === "/api/debug-auth";
 
-  if (!session && !isLoginPage && !isApiAuth && !isDebugAuth) {
+  // Only protect the dashboard and order pages
+  // API and Static files are excluded by the matcher
+  if (!session && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   
@@ -20,13 +20,14 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc)
+     * Match only the pages that need authentication.
+     * This avoids loading the Auth stack for EVERY single API request or asset.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|$).*)',
+    '/',
+    '/dashboard',
+    '/orders/:path*',
+    '/admin/:path*',
+    '/import',
+    '/settings'
   ],
 };

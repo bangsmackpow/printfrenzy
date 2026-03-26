@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:build": "npx @cloudflare/next-on-pages --minify",
     "deploy": "npm run build && npm run pages:build && wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {

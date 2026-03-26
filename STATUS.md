@@ -4,8 +4,11 @@
 - **Fixed Order Notes & Print Name Fields**: Identified that `notes` and `print_name` were missing from the database schema. Updated `schema.sql` and provided `migration.sql`. Also added an explicit "Save Notes" button to the order details UI for better user feedback.
 - **USPS Shipping Feature Added**: Implemented a "Purchase USPS Label" feature on the order details page. It groups by customer and allows generating real USPS shipping labels via the Shippo API.
 - **Global Production Print Tab**: Added a dedicated "Production Print" link to the sidebar. This page now generates a global manifest of ALL items currently in the "PRINTING" status, making it easier to run large print jobs across multiple batches (Wix or Manual).
-- **Bundle Size Optimization**: Removed unused `@aws-sdk` dependencies and `src/utils/r2Client.ts` which were bloating the Worker bundle beyond Cloudflare's 3MB limit.
-- **Fixed package.json**: Merged duplicate `scripts` keys and added a dedicated `deploy` script with `--minify` enabled.
+- **Major Bundle Size Optimization**:
+    - Removed `bcryptjs` and switched to native **Web Crypto PBKDF2** (adds 0 bytes to bundle).
+    - Enabled **Build Minification** via `next-on-pages --minify`.
+    - **API Consolidation**: Merged 15+ individual API routes into consolidated "Catch-all" routes (`api/admin/[[...slug]]` and `api/orders/[[...slug]]`). This removed ~3MB of redundant Next.js Edge boilerplate.
+    - **Middleware Matcher**: Restricted middleware to only run on necessary routes, preventing it from loading for every API call or asset.
 
 ## Required Actions for Developer/Admin
 1. **Database Migration**: The local database needs to be updated with the new columns and the `shipments` table.
