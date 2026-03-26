@@ -65,7 +65,7 @@ export default function CSVImport() {
       
       if (res.ok) {
         setStatus("success");
-        setResults({ count: data.count, skipped: data.skipped });
+        setResults({ count: data.count, skipped: 0 }); // Note: updated to match new simplified return
         setFile(null); // Clear file after successful import
         if (fileInputRef.current) fileInputRef.current.value = "";
         setBatchName(""); // Clear batch name after successful import
