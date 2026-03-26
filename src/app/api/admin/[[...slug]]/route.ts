@@ -9,7 +9,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+  const role = (session?.user as { role?: string })?.role;
+  if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -41,7 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+  const role = (session?.user as { role?: string })?.role;
+  if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -95,7 +97,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+  const role = (session?.user as { role?: string })?.role;
+  if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

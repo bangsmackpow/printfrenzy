@@ -23,7 +23,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
-    } else if (session && (session.user as { role?: string })?.role !== 'ADMIN') {
+    } else if (session && (session.user as { role?: string })?.role !== 'ADMIN' && (session.user as { role?: string })?.role !== 'MANAGER') {
       router.push('/dashboard');
     } else if (session) {
       fetchUsers();
