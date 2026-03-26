@@ -38,14 +38,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
         const results = await db.prepare("SELECT * FROM orders WHERE status = 'PRINTING' ORDER BY order_number DESC, customer_name ASC").all();
         return NextResponse.json(results.results);
       }
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 2. Default: GET /api/orders
   try {
     const results = await db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
     return NextResponse.json(results.results);
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  } catch (e: unknown) { 
+    const error = e as Error;
+    return NextResponse.json({ error: error.message }, { status: 500 }); 
+  }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
@@ -94,7 +100,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
             }
         }
         return NextResponse.json({ count });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 2. POST /api/orders/bulk-status
@@ -104,7 +113,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const placeholders = orderIds.map(() => '?').join(',');
       await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 3. POST /api/orders/status
@@ -113,7 +125,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { id, status } = await req.json();
       await db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 4. POST /api/orders/update-notes
@@ -122,7 +137,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { order_number, notes } = await req.json();
       await db.prepare("UPDATE orders SET notes = ? WHERE order_number = ?").bind(notes, order_number).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 5. POST /api/orders/update-item
@@ -131,7 +149,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { id, print_name } = await req.json();
       await db.prepare("UPDATE orders SET print_name = ? WHERE id = ?").bind(print_name, id).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 6. POST /api/orders/manual
@@ -141,7 +162,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
         .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, quantity || 1).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -165,7 +189,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
       if (id) await db.prepare("DELETE FROM orders WHERE id = ?").bind(id).run();
       else if (orderNumber) await db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
