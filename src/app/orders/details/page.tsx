@@ -33,7 +33,16 @@ interface Rate {
 
 function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, customerName: string }) {
     const [loading, setLoading] = useState(false);
-    const [address, setAddress] = useState({ street: '', city: '', state: '', zip: '' });
+    const [address, setAddress] = useState({ 
+        street: '', 
+        city: '', 
+        state: '', 
+        zip: '',
+        weight: '7',
+        length: '12',
+        width: '11',
+        height: '2'
+    });
     const [shipment, setShipment] = useState<{ tracking_number?: string, label_url?: string } | null>(null);
     const [error, setError] = useState("");
     const [rates, setRates] = useState<Rate[]>([]);
@@ -133,6 +142,25 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
                 </div>
             </div>
 
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 pt-4 border-t border-slate-50">
+                <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-slate-400 ml-1">Weight (oz)</p>
+                    <input type="number" placeholder="OZ" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-300" value={address.weight} onChange={e => setAddress({...address, weight: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-slate-400 ml-1">L (in)</p>
+                    <input type="number" placeholder="L" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono placeholder:text-slate-300" value={address.length} onChange={e => setAddress({...address, length: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-slate-400 ml-1">W (in)</p>
+                    <input type="number" placeholder="W" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono placeholder:text-slate-300" value={address.width} onChange={e => setAddress({...address, width: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-slate-400 ml-1">H (in)</p>
+                    <input type="number" placeholder="H" className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono placeholder:text-slate-300" value={address.height} onChange={e => setAddress({...address, height: e.target.value})} />
+                </div>
+            </div>
+
             {rates.length > 0 && (
                 <div className="mt-6 space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top-2">
                     <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest mb-3 ml-1">Available Shipping Methods</p>
@@ -167,10 +195,10 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
             {!rates.length && (
                 <button 
                     onClick={handleGetRates} 
-                    disabled={loading || !address.street || !address.city || !address.state || !address.zip} 
+                    disabled={loading || !address.street || !address.city || !address.state || !address.zip || !address.weight} 
                     className="w-full bg-slate-900 text-white px-4 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all flex items-center justify-center gap-2 mt-2"
                 >
-                    {loading ? <span className="animate-pulse">Analyzing Rates...</span> : 'Get Live USPS Rates'}
+                    {loading ? <span className="animate-pulse">Comparing Rates...</span> : 'Compare Carrier Rates'}
                 </button>
             )}
         </div>

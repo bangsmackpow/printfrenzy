@@ -48,14 +48,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
     try {
       const body = await req.json();
-      const { customer_name, street, city, state, zip } = body;
+      const { customer_name, street, city, state, zip, weight, length, width, height } = body;
+      const finalWeight = weight || "7";
+      const finalLength = length || "12";
+      const finalWidth = width || "11";
+      const finalHeight = height || "2";
 
       const senderAddress = process.env.SHIPPO_SENDER_ADDRESS_JSON 
         ? JSON.parse(process.env.SHIPPO_SENDER_ADDRESS_JSON) 
         : { name: "Print Frenzy", street1: "123 Main St", city: "Creston", state: "IA", zip: "50801", country: "US" };
 
       const toAddress = { name: customer_name || "Customer", street1: street, city: city, state: state, zip: zip, country: "US" };
-      const parcel = { length: "12", width: "10", height: "4", distance_unit: "in", weight: "16", mass_unit: "oz" };
+      const parcel = { 
+        length: finalLength, 
+        width: finalWidth, 
+        height: finalHeight, 
+        distance_unit: "in", 
+        weight: finalWeight, 
+        mass_unit: "oz" 
+      };
 
       const sRes = await fetch('https://api.goshippo.com/shipments/', {
         method: 'POST',
