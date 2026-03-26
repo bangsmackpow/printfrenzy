@@ -19,10 +19,4 @@
    ```
    *Note: If you have already deployed this to production, you will also need to run this against your remote D1 database by adding `--remote`.*
 
-2. **Shippo Integration Setup**:
-   - Create a free account at [Shippo](https://goshippo.com/).
-   - Generate an API Key (Test or Live).
-   - Add the key to your `.env` (for local dev) and Cloudflare Pages Environment Variables:
-     `SHIPPO_API_KEY="shippo_test_..."`
-   - *(Optional)* Add your default sender address as a JSON string to avoid using the fallback dummy address:
-     `SHIPPO_SENDER_ADDRESS_JSON='{"name": "Your Shop", "street1": "123 Main St", "city": "City", "state": "ST", "zip": "12345", "country": "US"}'`
+2. **Shippo Integration Setup**: ✅ **DONE** (Added to Cloudflare)
