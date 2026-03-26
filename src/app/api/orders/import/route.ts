@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
-import { parse } from 'csv-parse/sync';
 
 export const runtime = 'edge';
+
+// Lightweight CSV parser to replace 'csv-parse' dependency
+function parseCSV(text: string) {
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+  if (lines.length === 0) return [];
+  
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  return lines.slice(1).map(line => {
+    const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const record: Record<string, string> = {};
+    headers.forEach((header, i) => {
+      record[header] = values[i] || "";
+    });
+    return record;
+  });
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -34,12 +49,7 @@ export async function POST(req: NextRequest) {
     const text = await file.text();
     const db = (process.env as unknown as { DB: D1Database }).DB;
 
-    const records = parse(text, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      relax_column_count: true
-    });
+    const records = parseCSV(text);
 
     if (records.length === 0) {
       return NextResponse.json({ error: "No records found in CSV" }, { status: 400 });
@@ -48,7 +58,7 @@ export async function POST(req: NextRequest) {
     let importCount = 0;
     let skipCount = 0;
 
-    for (const record of records as Array<Record<string, string>>) {
+    for (const record of records) {
       // Mapping Wix Columns
       const wixOrderNum = record['Order number'] || record['Order ID'] || record['order_number'];
       const customerName = record['Customer name'] || record['Billing Name'] || record['customer_name'] || 'Unknown Customer';
@@ -89,4 +99,4 @@ export async function POST(req: NextRequest) {
     console.error("CSV Import Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+}
