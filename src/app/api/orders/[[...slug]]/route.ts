@@ -46,12 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { searchParams } = new URL(req.url);
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  // Debug Schema & Data
-  if (slug?.[0] === 'debug') {
-    const schema = await db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table'").all();
-    const samples = await db.prepare("SELECT * FROM orders WHERE order_number NOT LIKE '14%' LIMIT 5").all();
-    return NextResponse.json({ schema: schema.results, samples: samples.results });
-  }
+
 
   // 1. GET /api/orders/details?order_number=...
   if (slug?.[0] === 'details') {
