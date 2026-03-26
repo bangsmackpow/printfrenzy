@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
-import { hashPassword } from "@/utils/hashUtils";
 
 export const runtime = 'edge';
 
 /**
  * Consolidated Orders API
- * Merging 8 routes into 1 to reduce Next.js Edge overhead by ~2.5MB.
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
@@ -27,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
   }
 
-  // 2. GET /api/orders (Standard list)
+  // 2. Default: GET /api/orders
   try {
     const results = await db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
     return NextResponse.json(results.results);
@@ -39,7 +37,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Check Auth for all POST routes
+  if (!session) {
+    // Exception for 'import' if x-api-key is present
+    const apiKey = req.headers.get("x-api-key");
+    if (!(apiKey && apiKey === process.env.API_IMPORT_KEY)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
 
   // 1. POST /api/orders/bulk-status
   if (slug?.[0] === 'bulk-status') {
@@ -66,6 +71,52 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { order_number, customer_name, product_name, variant, image_url, quantity } = await req.json();
       await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
         .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, quantity || 1).run();
+      return NextResponse.json({ success: true });
+    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  }
+
+  // 4. POST /api/orders/status (Update single status)
+  if (slug?.[0] === 'status') {
+    try {
+      const { id, status } = await req.json();
+      await db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id).run();
+      return NextResponse.json({ success: true });
+    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  }
+
+  // 5. POST /api/orders/update-item (Update print_name etc)
+  if (slug?.[0] === 'update-item') {
+    try {
+      const { id, print_name } = await req.json();
+      await db.prepare("UPDATE orders SET print_name = ? WHERE id = ?").bind(print_name, id).run();
+      return NextResponse.json({ success: true });
+    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  }
+
+  return NextResponse.json({ error: "Not Found" }, { status: 404 });
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
+  const { slug } = await params;
+  const session = await auth();
+  const db = (process.env as unknown as { DB: D1Database }).DB;
+
+  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // 1. DELETE /api/orders/delete?id=... OR ?order_number=...
+  if (slug?.[0] === 'delete') {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const orderNumber = searchParams.get('order_number');
+
+    try {
+      if (id) {
+        await db.prepare("DELETE FROM orders WHERE id = ?").bind(id).run();
+      } else if (orderNumber) {
+        await db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber).run();
+      }
       return NextResponse.json({ success: true });
     } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
   }

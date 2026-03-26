@@ -6,459 +6,329 @@ import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { useSession, signOut } from "next-auth/react";
 import Image from 'next/image';
 
+type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
+
 interface Order {
   id: string;
   order_number: string;
   customer_name: string;
   product_name: string;
   variant: string;
-  quantity: number;
   image_url: string;
-  status: string;
+  status: OrderStatus;
+  quantity: number;
   created_at: string;
   notes?: string;
   print_name?: string;
 }
 
-type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
-
 function DashboardContent() {
-  const { data: session } = useSession();
-  const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN' || (session?.user as { role?: string })?.role === 'MANAGER';
-  
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeStatus, setActiveStatus] = useState<OrderStatus>('RECEIVED');
-  const [searchQuery, setSearchQuery] = useState('');
-  
+  const { data: session, status: authStatus } = useSession();
   const router = useRouter();
+  const [items, setItems] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<OrderStatus | 'ALL'>('RECEIVED');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const fetchOrders = useCallback(async () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const url = new URL('/api/orders', window.location.origin);
-      url.searchParams.set('status', activeStatus);
-      if (searchQuery) url.searchParams.set('q', searchQuery);
-      
-      const res = await fetch(url.toString());
+      const res = await fetch('/api/orders');
       if (res.ok) {
-        const data = await res.json();
-        setOrders(data);
+        setItems(await res.json());
       }
     } catch (err) {
-      console.error("Failed to fetch orders:", err);
+      console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [activeStatus, searchQuery]);
+  }, []);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  const getNextStatus = (current: OrderStatus): OrderStatus | null => {
-    switch(current) {
-        case 'RECEIVED': return 'ORDERING';
-        case 'ORDERING': return 'PRINTING';
-        case 'PRINTING': return 'PRODUCTION';
-        case 'PRODUCTION': return 'COMPLETED';
-        case 'COMPLETED': return 'ARCHIVED';
-        default: return null;
+    if (authStatus === 'unauthenticated') {
+      router.push('/login');
+    } else if (authStatus === 'authenticated') {
+      fetchItems();
     }
-  };
+  }, [authStatus, router, fetchItems]);
 
-  const updateStatus = async (orderId: string, currentStatus: OrderStatus, targetStatus?: OrderStatus) => {
-    const newStatus = targetStatus || getNextStatus(currentStatus);
-    if (!newStatus) return;
-
+  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
+      const res = await fetch(`/api/orders/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ id: orderId, status: newStatus }),
       });
 
       if (res.ok) {
-        setOrders(orders.filter(o => o.id !== orderId));
-      } else {
-        const data = await res.json();
-        alert(`Failed to update status: ${data.error || 'Server error'}`);
+        setItems(prev => prev.map(item => item.id === orderId ? { ...item, status: newStatus } : item));
       }
     } catch (err) {
-      console.error("Status update error:", err);
+      console.error("Update error:", err);
     }
   };
 
-  const bulkUpdateStatus = async (orderNumber: string, currentStatus: OrderStatus, targetStatus?: OrderStatus) => {
-    const newStatus = targetStatus || getNextStatus(currentStatus);
-    if (!newStatus) return;
-
+  const bulkUpdateStatus = async (newStatus: OrderStatus) => {
+    if (selectedIds.length === 0) return;
     try {
       const res = await fetch(`/api/orders/bulk-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          order_number: orderNumber, 
-          status: newStatus,
-          current_status: currentStatus
-        }),
+        body: JSON.stringify({ orderIds: selectedIds, status: newStatus }),
       });
 
       if (res.ok) {
-        setOrders(orders.filter(o => o.order_number !== orderNumber));
-        await fetchOrders();
-      } else {
-        const data = await res.json();
-        alert(`Failed to update group status: ${data.error || 'Server error'}`);
+        setItems(prev => prev.map(item => selectedIds.includes(item.id) ? { ...item, status: newStatus } : item));
+        setSelectedIds([]);
       }
     } catch (err) {
-      console.error("Bulk status update error:", err);
+      console.error("Bulk update error:", err);
     }
   };
 
-  // Grouping logic for rendering
-  const groupedOrders = orders.reduce((acc, order) => {
-    const key = order.order_number || order.id;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(order);
+  const deleteGroup = async (orderNumber: string) => {
+    if (!confirm(`Are you sure you want to delete Batch #${orderNumber}?`)) return;
+    try {
+      const res = await fetch(`/api/orders/delete?order_number=${orderNumber}`, { method: 'DELETE' });
+      if (res.ok) {
+        setItems(prev => prev.filter(item => item.order_number !== orderNumber));
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
+
+  if (authStatus === 'loading' || loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
+        <div className="h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="font-black text-[10px] uppercase tracking-widest text-slate-400">Syncing Production Queue</p>
+      </div>
+    );
+  }
+
+  const filteredItems = filter === 'ALL' ? items : items.filter(i => i.status === filter);
+
+  // Group by order_number
+  const grouped = filteredItems.reduce((acc, item) => {
+    if (!acc[item.order_number]) acc[item.order_number] = [];
+    acc[item.order_number].push(item);
     return acc;
   }, {} as Record<string, Order[]>);
 
-  const statusTabs: { label: string; value: OrderStatus; count?: number }[] = [
-    { label: 'Received', value: 'RECEIVED' },
-    { label: 'Retrieve/Order', value: 'ORDERING' },
-    { label: 'Print Queue', value: 'PRINTING' },
-    { label: 'Production', value: 'PRODUCTION' },
-    { label: 'Completed', value: 'COMPLETED' },
-    { label: 'Archive', value: 'ARCHIVED' },
-  ];
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleGroup = (ids: string[]) => {
+    const allSelected = ids.every(id => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds(prev => prev.filter(id => !ids.includes(id)));
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...ids])));
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc]">
-      {/* Navigation Header */}
-      <div className="bg-slate-900 text-white py-4 shadow-lg shadow-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <h2 className="text-xl font-black italic tracking-tighter">PrintFrenzy</h2>
-            <nav className="hidden md:flex gap-6 text-sm font-bold">
-              <a href="/dashboard" className="text-blue-400">Queue</a>
-              <a href="/admin/users" className="hover:text-blue-400 transition-colors">Staff</a>
-              <a href="/admin/audit" className="hover:text-blue-400 transition-colors">Audit</a>
-              <a href="/admin/reports" className="hover:text-blue-400 transition-colors">Reports</a>
-              <a href="/import" className="hover:text-blue-400 transition-colors">Wix Import</a>
-              <a href="/orders/new" className="hover:text-blue-400 transition-colors">Manual Order</a>
-            </nav>
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
+      <header className="flex justify-between items-end mb-12">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-3 w-3 bg-blue-600 rounded-full animate-pulse"></div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Live Production System</p>
           </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={() => router.push('/settings')}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-            >
-              Settings
+          <h1 className="text-6xl font-black text-slate-900 tracking-tighter italic uppercase">Print Queue</h1>
+        </div>
+        
+        <div className="flex gap-4 items-center">
+            <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 flex gap-1">
+                {(['RECEIVED', 'ORDERING', 'PRINTING', 'PRODUCTION', 'COMPLETED', 'ALL'] as const).map((s) => (
+                    <button
+                        key={s}
+                        onClick={() => setFilter(s)}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            filter === s ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                        {s === 'RECEIVED' ? 'New' : s}
+                    </button>
+                ))}
+            </div>
+            <button onClick={() => signOut()} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-red-500 hover:border-red-100 transition-all shadow-sm group">
+                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             </button>
-            <button 
-              onClick={() => signOut()}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-            >
-              Logout
-            </button>
+        </div>
+      </header>
+
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-8 py-5 rounded-[2.5rem] shadow-2xl flex items-center gap-8 border border-white/10 backdrop-blur-xl animate-in slide-in-from-bottom-10">
+          <div className="flex items-center gap-3 border-r border-white/10 pr-8">
+            <span className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center font-black text-xs">{selectedIds.length}</span>
+            <p className="text-[10px] font-black uppercase tracking-widest">Selected Items</p>
+          </div>
+          <div className="flex gap-2">
+            {(['ORDERING', 'PRINTING', 'PRODUCTION', 'COMPLETED'] as OrderStatus[]).map(status => (
+              <button 
+                key={status}
+                onClick={() => bulkUpdateStatus(status)}
+                className="px-5 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border border-white/5"
+              >
+                Move to {status}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setSelectedIds([])} className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white ml-4">Cancel</button>
+        </div>
+      )}
+
+      {Object.keys(grouped).length === 0 ? (
+        <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-32 text-center">
+          <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8">
+            <svg className="h-10 w-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H4a2 2 0 00-2 2v7m18 0a2 2 0 01-2 2H4a2 2 0 01-2-2m18 0l-2 2H4l-2-2m18-5l-8 8-4-4-6 6" /></svg>
+          </div>
+          <h3 className="text-2xl font-black text-slate-900 uppercase italic">Queue is Empty</h3>
+          <p className="text-slate-400 font-bold mt-2">No items found for the current filter.</p>
+          <div className="mt-8 flex justify-center gap-4">
+              <a href="/import" className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all">Import Wix Orders</a>
+              <a href="/orders/new" className="px-8 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all">Manual Order</a>
           </div>
         </div>
-      </div>
-
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between py-4 gap-4">
-            <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-              {statusTabs.map((tab) => (
-                <button
-                  key={tab.value}
-                  onClick={() => setActiveStatus(tab.value)}
-                  className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-                    activeStatus === tab.value
-                       ? 'bg-white text-blue-600 shadow-sm'
-                       : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="relative w-full md:w-96">
-              <input
-                type="text"
-                placeholder="Search orders, customers..."
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <svg className="absolute left-3 top-2.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-              {statusTabs.find(t => t.value === activeStatus)?.label}
-            </h1>
-            <p className="text-slate-500 mt-1 font-medium">
-              {loading ? 'Refreshing...' : `${Object.keys(groupedOrders).length} unique orders`}
-            </p>
-          </div>
-          <button onClick={fetchOrders} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-            <svg className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        </div>
-
-        {loading && orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="animate-pulse flex flex-col items-center">
-              <div className="h-12 w-12 bg-blue-100 rounded-full mb-4"></div>
-              <div className="h-4 w-32 bg-slate-200 rounded mb-2"></div>
-            </div>
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="text-center py-32 bg-white rounded-3xl border border-dashed text-slate-400">
-            No orders found.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {Object.entries(groupedOrders).map(([groupKey, items]) => (
-              <div key={groupKey} className="group bg-white rounded-3xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hover:shadow-xl transition-all duration-300">
-                <div 
-                    className="aspect-square bg-slate-50 relative cursor-pointer group/cardimg"
-                    onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
-                >
-                  <Image 
-                    src={getPrinterQualityImage(items[0].image_url)} 
-                    alt="Order Thumb"
-                    fill
-                    className="object-contain p-4 group-hover/cardimg:scale-105 transition-transform"
-                    unoptimized
-                  />
-                  <div className="absolute top-4 left-4 bg-white/90 px-3 py-1 rounded-full text-xs font-black border">
-                    #{items[0].order_number || 'MANUAL'}
-                  </div>
-                  {items.length > 1 && (
-                    <div className="absolute bottom-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                      {items.length} Items in Order
-                    </div>
-                  )}
-                  {/* View Details Overlay */}
-                  <div className="absolute inset-0 bg-slate-900/0 group-hover/cardimg:bg-slate-900/10 flex items-center justify-center transition-all">
-                      <span className="bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase scale-0 group-hover/cardimg:scale-100 transition-all shadow-xl">View Details</span>
-                  </div>
-                </div>
-
-                <div className="p-6 flex-grow flex flex-col">
-                  <div className="mb-4 flex justify-between items-start">
-                    <div>
-                        <h3 
-                            className="font-extrabold text-slate-800 truncate cursor-pointer hover:text-blue-600"
-                            onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
-                        >
-                            {items[0].order_number || 'Manual Order'}
-                        </h3>
-                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight">Production Batch</p>
-                    </div>
-                    {items[0].notes && (
-                        <div className="bg-amber-100 text-amber-600 px-2 py-1 rounded-lg text-[9px] font-black uppercase flex items-center gap-1 border border-amber-200 animate-pulse">
-                            📝 Note
-                        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-16">
+          {Object.entries(grouped).map(([orderNum, items]) => {
+            const groupIds = items.map(i => i.id);
+            const isGroupSelected = groupIds.every(id => selectedIds.includes(id));
+            
+            return (
+              <section key={orderNum} className="group/section">
+                <div className="flex items-center gap-6 mb-8 px-4">
+                  <button 
+                    onClick={() => toggleGroup(groupIds)}
+                    className={`h-10 w-10 rounded-2xl flex items-center justify-center transition-all ${
+                        isGroupSelected ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-300 hover:border-blue-200 hover:text-blue-400'
+                    }`}
+                  >
+                    {isGroupSelected ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                        <div className="h-2 w-2 rounded-full bg-current"></div>
                     )}
+                  </button>
+                  
+                  <div className="flex flex-col">
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">Batch Identifier</p>
+                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase flex items-center gap-4">
+                        Batch: {orderNum}
+                        <span className="text-slate-200 font-normal">/</span>
+                        <span className="text-blue-600 text-2xl">#{items.length} Items</span>
+                    </h2>
                   </div>
 
-                  <div className="space-y-4 mb-6 flex-grow">
-                    {items.slice(0, 4).map((item) => (
-                      <div key={item.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 relative group/item hover:bg-white hover:shadow-md transition-all duration-200">
-                        <div className="flex gap-3">
-                          {/* Image Thumbnail with individual click */}
-                          <div className="h-16 w-16 flex-shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden relative group/img z-10">
-                            <Image 
-                                src={getPrinterQualityImage(item.image_url)} 
-                                alt={item.product_name}
-                                fill
-                                className="object-contain p-1"
-                                unoptimized
-                            />
-                            {/* Hover Preview Overlay */}
-                            <div className="absolute inset-0 z-20 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                <a 
-                                    href={getPrinterQualityImage(item.image_url, true)} 
-                                    target="_blank" 
-                                    className="absolute inset-0 bg-slate-900/40 flex items-center justify-center"
-                                >
-                                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z" /></svg>
-                                </a>
-                                <div className="hidden group-hover/img:block absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-[500px] h-[500px] bg-white rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-200 overflow-hidden z-[9999] pointer-events-none p-4 origin-bottom scale-90 animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="absolute top-4 left-6 right-6 flex items-center justify-between text-[10px] font-black uppercase text-slate-400">
-                                        <span>High-Res Master</span>
-                                        <span>Click to Download Full</span>
-                                    </div>
-                                    <div className="relative w-full h-full">
-                                        <Image 
-                                            src={getPrinterQualityImage(item.image_url, true)} 
-                                            alt="Preview" 
-                                            fill
-                                            className="object-contain"
-                                            unoptimized
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                          </div>
+                  <div className="flex-grow h-[1px] bg-slate-100 group-hover/section:bg-blue-100 transition-colors"></div>
 
-                          <div className="flex-grow min-w-0">
-                            <div className="flex justify-between items-start">
-                                <h4 className="text-[11px] font-black text-slate-800 leading-tight truncate pr-1">{item.product_name}</h4>
-                                <span className="bg-white px-2 py-0.5 rounded-lg border text-blue-600 text-[9px] font-black">x{item.quantity}</span>
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase italic truncate">{item.customer_name}</p>
-                            <div className="flex items-start justify-between mt-2 gap-2">
-                                <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-1 rounded-md font-bold leading-tight flex-grow">{item.variant}</span>
-                                
-                                {/* Individual status update */}
-                                 <div className="flex gap-1">
-                                  <button 
-                                    onClick={() => updateStatus(item.id, activeStatus)}
-                                    className="h-6 w-6 flex-shrink-0 bg-white border border-slate-200 rounded-l-lg shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all border-r-0"
-                                    title="Push to Next Stage"
-                                  >
-                                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                                  </button>
-                                  <div className="relative group/itemstatus">
-                                      <button className="h-6 px-1.5 bg-slate-50 border border-slate-200 rounded-r-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center text-[8px] font-black">
-                                          ^
-                                      </button>
-                                      <div className="absolute bottom-full right-0 mb-1 w-32 bg-white rounded-xl shadow-xl border border-slate-100 opacity-0 invisible group-hover/itemstatus:opacity-100 group-hover/itemstatus:visible transition-all z-[100] overflow-hidden">
-                                          {statusTabs.map(tab => (
-                                              <button 
-                                                  key={tab.value}
-                                                  onClick={() => updateStatus(item.id, activeStatus, tab.value)}
-                                                  className="w-full text-left px-3 py-1.5 text-[9px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase whitespace-nowrap"
-                                              >
-                                                  {tab.label}
-                                              </button>
-                                          ))}
-                                      </div>
-                                  </div>
-                                </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {items.length > 4 && (
+                  <div className="flex gap-2">
+                    <button 
+                        onClick={() => router.push(`/orders/details?order_number=${orderNum}`)}
+                        className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:border-blue-200 hover:text-blue-600 transition-all shadow-sm"
+                    >
+                        View Full Details
+                    </button>
+                    {session?.user?.role === 'ADMIN' && (
                         <button 
-                            onClick={() => items[0].order_number && router.push(`/orders/details?order_number=${encodeURIComponent(items[0].order_number)}`)}
-                            className="w-full py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-blue-50 hover:text-blue-600 transition-all"
+                            onClick={() => deleteGroup(orderNum)}
+                            className="p-3 bg-white border border-slate-200 text-slate-300 rounded-2xl hover:text-red-500 hover:border-red-100 transition-all shadow-sm"
                         >
-                            + {items.length - 4} more items...
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h14" /></svg>
                         </button>
                     )}
                   </div>
-
-                  <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-slate-100">
-                    <div className="flex gap-1">
-                        {activeStatus !== 'ARCHIVED' && (
-                            <button 
-                                onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, activeStatus) : updateStatus(items[0].id, activeStatus)}
-                                className="flex-grow bg-slate-900 hover:bg-blue-600 text-white font-bold py-3.5 rounded-l-2xl rounded-r-md transition-all flex items-center justify-center gap-2 text-sm"
-                            >
-                                {activeStatus === 'RECEIVED' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Verify & Prep</>}
-                                {activeStatus === 'ORDERING' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg> Send to Print</>}
-                                {activeStatus === 'PRINTING' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg> Print Finished</>}
-                                {activeStatus === 'PRODUCTION' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Complete Order</>}
-                                {activeStatus === 'COMPLETED' && <><svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> Archive Order</>}
-                            </button>
-                        )}
-
-                        {isAdmin && (
-                            <div className="relative group/menu">
-                                <button className="h-full px-3 bg-slate-800 text-white rounded-r-2xl rounded-l-md hover:bg-slate-700 flex items-center justify-center font-black">
-                                    ^
-                                </button>
-                                <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-30 overflow-hidden">
-                                    <div className="p-2 border-b border-slate-50 text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Jump to Stage</div>
-                                    {statusTabs.map(tab => (
-                                        <button 
-                                            key={tab.value}
-                                            onClick={() => items[0].order_number ? bulkUpdateStatus(items[0].order_number, activeStatus, tab.value) : updateStatus(items[0].id, activeStatus, tab.value)}
-                                            className="w-full text-left px-4 py-2.5 text-[11px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors uppercase"
-                                        >
-                                            {tab.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {activeStatus === 'PRINTING' && (
-                        <a 
-                            href={`/orders/print?order_number=${encodeURIComponent(items[0].order_number || '')}`}
-                            target="_blank"
-                            className="bg-slate-100 hover:bg-slate-200 py-2.5 rounded-xl flex items-center justify-center text-slate-600 text-[10px] font-black uppercase tracking-widest gap-2"
-                            title="Print Manifest"
-                        >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-                            Generate Printer Manifest
-                        </a>
-                    )}
-
-                    {activeStatus === 'ARCHIVED' && (
-                        <div className="w-full py-3.5 text-center text-xs font-black text-slate-400 border border-dashed border-slate-200 rounded-2xl uppercase tracking-widest">
-                            Official Archive
-                        </div>
-                    )}
-                    <button 
-                      onClick={async () => {
-                        const label = items[0].order_number || items[0].customer_name;
-                        if (window.confirm(`Delete items for ${label}?`)) {
-                          const query = items[0].order_number 
-                            ? `order_number=${items[0].order_number}` 
-                            : `id=${items[0].id}`;
-                          try {
-                            const res = await fetch(`/api/orders/delete?${query}`, { method: 'DELETE' });
-                            if (res.ok) {
-                                fetchOrders();
-                            } else {
-                                const data = await res.json();
-                                alert(`Delete failed: ${data.error || "Unknown server error"}`);
-                            }
-                          } catch (err: unknown) { 
-                            const e = err as Error;
-                            alert("An error occurred: " + e.message); 
-                          }
-                        }
-                      }}
-                      className="p-3.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-2xl transition-all active:scale-95"
-                      title="Delete Order"
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
+                  {items.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className={`group relative bg-white rounded-[2rem] border-2 transition-all duration-500 flex flex-col overflow-hidden ${
+                        selectedIds.includes(item.id) 
+                          ? 'border-blue-600 shadow-2xl shadow-blue-100 scale-[1.02]' 
+                          : 'border-slate-100 hover:border-blue-200 shadow-xl shadow-slate-200/50'
+                      }`}
+                    >
+                      {/* Checkbox Overlay */}
+                      <button 
+                        onClick={() => toggleSelect(item.id)}
+                        className={`absolute top-4 left-4 z-10 h-8 w-8 rounded-xl flex items-center justify-center transition-all ${
+                            selectedIds.includes(item.id) ? 'bg-blue-600 text-white rotate-0' : 'bg-white/90 backdrop-blur shadow-md text-slate-300 opacity-0 group-hover:opacity-100 -rotate-12 group-hover:rotate-0'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                      </button>
+
+                      {/* Image Container */}
+                      <div className="aspect-square relative overflow-hidden bg-slate-50 group-hover:bg-blue-50 transition-colors">
+                        <Image 
+                          src={getPrinterQualityImage(item.image_url)} 
+                          alt={item.product_name} 
+                          fill 
+                          className="object-contain p-6 group-hover:scale-110 transition-transform duration-700 ease-out"
+                          unoptimized
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-6 flex-grow flex flex-col">
+                        <div className="mb-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{item.customer_name}</p>
+                            <h3 className="text-lg font-black text-slate-900 leading-tight uppercase italic truncate">{item.product_name}</h3>
+                        </div>
+
+                        <div className="flex gap-2 mb-6">
+                            <span className="bg-slate-900 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest italic">
+                                x{item.quantity}
+                            </span>
+                            <span className="bg-slate-50 border border-slate-100 text-slate-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest truncate">
+                                {item.variant || 'Standard'}
+                            </span>
+                        </div>
+
+                        <div className="mt-auto space-y-2">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Quick Move</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {(['PRINTING', 'PRODUCTION', 'COMPLETED'] as const).map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => updateStatus(item.id, s)}
+                                        className={`py-2 rounded-xl text-[8px] font-black uppercase tracking-[0.15em] transition-all border ${
+                                            item.status === s 
+                                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' 
+                                                : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200 hover:text-blue-600'
+                                        }`}
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading Queue...</div>}>
+    <Suspense fallback={<div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <div className="h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="font-black text-[10px] uppercase tracking-widest text-slate-400 italic">Accessing Printer Vault</p>
+    </div>}>
       <DashboardContent />
     </Suspense>
   );

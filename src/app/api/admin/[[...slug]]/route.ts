@@ -67,5 +67,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
   }
 
+  // 3. POST /api/admin/users/password (Reset another user's password)
+  if (slug?.[0] === 'users' && slug?.[1] === 'password') {
+    try {
+        const { id, password } = await req.json();
+        const hashedPassword = await hashPassword(password);
+        await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(hashedPassword, id).run();
+        return NextResponse.json({ success: true });
+    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  }
+
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
 }
