@@ -69,14 +69,26 @@ export default function AdminUsersPage() {
     if (!newPass) return;
 
     try {
-      const res = await fetch(`/api/admin/users/password`, { // Note: using consolidated pattern
+      const res = await fetch(`/api/admin/users/password`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, password: newPass }), // We'll need to update the consolidated route to handle this
+        body: JSON.stringify({ id, password: newPass }), 
       });
       if (res.ok) alert("Password reset successfully");
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this staff member?")) return;
+    try {
+        const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            fetchUsers();
+        }
+    } catch (err) {
+        console.error(err);
     }
   };
 
@@ -118,8 +130,9 @@ export default function AdminUsersPage() {
                     {u.role}
                   </span>
                 </td>
-                <td className="p-6">
+                <td className="p-6 flex gap-4 items-center">
                   <button onClick={() => resetPassword(u.id)} className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Reset Password</button>
+                  <button onClick={() => handleDelete(u.id)} className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 transition-colors">Remove</button>
                 </td>
               </tr>
             ))}
@@ -129,3 +142,4 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+

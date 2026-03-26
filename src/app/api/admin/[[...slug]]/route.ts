@@ -18,7 +18,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     try {
       const results = await db.prepare("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC").all();
       return NextResponse.json(results.results);
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
   }
 
   // 2. GET /api/admin/audit
@@ -26,7 +28,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     try {
       const results = await db.prepare("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 100").all();
       return NextResponse.json(results.results);
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -49,10 +53,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)")
         .bind(crypto.randomUUID(), email, hashedPassword, role || 'USER').run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
   }
 
-  // 2. POST /api/admin/clear (Consolidated from /api/admin/orders/clear)
+  // 2. POST /api/admin/clear
   if (slug?.[0] === 'clear') {
     try {
       const { password } = await req.json();
@@ -64,7 +70,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("DELETE FROM orders").run();
       await db.prepare("DELETE FROM shipments").run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
   }
 
   // 3. POST /api/admin/users/password (Reset another user's password)
@@ -74,7 +82,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         const hashedPassword = await hashPassword(password);
         await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(hashedPassword, id).run();
         return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
+  }
+
+  return NextResponse.json({ error: "Not Found" }, { status: 404 });
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
+  const { slug } = await params;
+  const session = await auth();
+  const db = (process.env as unknown as { DB: D1Database }).DB;
+
+  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // 1. DELETE /api/admin/users?id=...
+  if (slug?.[0] === 'users') {
+    try {
+      const id = new URL(req.url).searchParams.get('id');
+      if (!id) return NextResponse.json({ error: "No ID provided" }, { status: 400 });
+      await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+      return NextResponse.json({ success: true });
+    } catch (e: unknown) { 
+        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
