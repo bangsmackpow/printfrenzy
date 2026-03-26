@@ -21,7 +21,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
   }
 
-  return NextResponse.json({ error: "Not Found" }, { status: 404 });
+  // 2. GET /api/shipping (List all)
+  try {
+    const results = await db.prepare("SELECT * FROM shipments ORDER BY created_at DESC LIMIT 100").all();
+    return NextResponse.json(results.results);
+  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
