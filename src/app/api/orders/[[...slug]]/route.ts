@@ -193,9 +193,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     const orderNumber = searchParams.get('order_number');
     try {
       if (id) {
-        // Find the batch number to clear related batch-level data if necessary
-        const orderData = await db.prepare("SELECT order_number FROM orders WHERE id = ?").bind(id).first() as { order_number: string } | null;
-        
         await db.batch([
           db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id),
           // We don't delete shipments here because it's a batch-level entity, 
