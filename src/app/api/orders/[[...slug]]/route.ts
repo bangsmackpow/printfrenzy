@@ -27,6 +27,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { searchParams } = new URL(req.url);
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
+  // Debug Schema
+  if (slug?.[0] === 'debug') {
+    const results = await db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table'").all();
+    return NextResponse.json(results.results);
+  }
+
   // 1. GET /api/orders/details?order_number=...
   if (slug?.[0] === 'details') {
     const orderNumber = searchParams.get('order_number');
@@ -187,13 +193,22 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     const orderNumber = searchParams.get('order_number');
     try {
       if (id) {
-        // Clear associated audit logs first
-        await db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id).run();
-        await db.prepare("DELETE FROM orders WHERE id = ?").bind(id).run();
+        // Find the batch number to clear related batch-level data if necessary
+        const orderData = await db.prepare("SELECT order_number FROM orders WHERE id = ?").bind(id).first() as { order_number: string } | null;
+        
+        await db.batch([
+          db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id),
+          // We don't delete shipments here because it's a batch-level entity, 
+          // but we clear the order itself
+          db.prepare("DELETE FROM orders WHERE id = ?").bind(id)
+        ]);
       } else if (orderNumber) {
-        // Clear all audit logs for orders in this batch
-        await db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber).run();
-        await db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber).run();
+        // For batch delete, clear everything related to these orders
+        await db.batch([
+          db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber),
+          db.prepare("DELETE FROM shipments WHERE order_number = ?").bind(orderNumber),
+          db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber)
+        ]);
       }
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
