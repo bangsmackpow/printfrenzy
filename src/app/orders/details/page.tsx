@@ -70,16 +70,21 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
             const data = await res.json();
             if (res.ok) {
                 if (data.rates && data.rates.length > 0) {
-                    const gaRate = data.rates.find((r: Rate) => r.servicelevel.token === 'usps_ground_advantage');
+                    const sortedAll = [...data.rates].sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount));
+                    const gaRate = sortedAll.find((r: Rate) => 
+                        r.servicelevel.token === 'usps_ground_advantage' || 
+                        r.servicelevel.name.toLowerCase().includes("ground advantage")
+                    );
+                    
                     if (gaRate) {
-                        const filtered = data.rates.filter((r: Rate) => 
+                        const filtered = sortedAll.filter((r: Rate) => 
                             r.object_id === gaRate.object_id || parseFloat(r.amount) < parseFloat(gaRate.amount)
                         );
-                        setRates(filtered.sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount)));
+                        setRates(filtered);
                         setSelectedRateId(gaRate.object_id);
                     } else {
-                        setRates(data.rates.sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount)));
-                        setSelectedRateId(data.rates[0].object_id);
+                        setRates(sortedAll);
+                        setSelectedRateId(sortedAll[0].object_id);
                     }
                 }
             } else {
