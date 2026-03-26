@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/utils/hashUtils";
 
 export const runtime = 'edge';
 
@@ -9,27 +9,27 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
-  if (!session || (session.user as any).role !== 'ADMIN') {
-    return NextResponse.json({ error: "Access Denied: Admin role required" }, { status: 403 });
+  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const { id } = await params;
+  const db = (process.env as unknown as { DB: D1Database }).DB;
 
   try {
     const { password } = await req.json();
-    if (!password || password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    if (!password) {
+      return NextResponse.json({ error: "Password is required" }, { status: 400 });
     }
 
-    const { id } = await params;
-    const db = (process.env as unknown as { DB: D1Database }).DB;
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
 
-    const result = await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
+    await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?")
       .bind(passwordHash, id)
       .run();
 
-    return NextResponse.json({ success: true, message: "Password updated successfully" });
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Admin Password Change Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

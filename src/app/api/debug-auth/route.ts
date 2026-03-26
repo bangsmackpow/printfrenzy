@@ -1,91 +1,50 @@
-import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import { NextRequest, NextResponse } from 'next/server';
+import { hashPassword, verifyPassword } from "@/utils/hashUtils";
 
 export const runtime = 'edge';
 
-interface D1PreparedStatement {
-  bind: (...args: unknown[]) => D1PreparedStatement;
-  first: <T = Record<string, unknown>>() => Promise<T | null>;
-}
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const email = searchParams.get('email');
+  const pass = searchParams.get('pass');
 
-interface D1Database {
-  prepare: (query: string) => D1PreparedStatement;
-}
-
-export async function GET() {
-  const results: {
-    timestamp: string;
-    env: { has_db: boolean; has_auth_secret: boolean };
-    tests: Record<string, unknown>;
-  } = {
-    timestamp: new Date().toISOString(),
-    env: {
-      has_db: !!(process.env as unknown as { DB: D1Database }).DB,
-      has_auth_secret: !!process.env.AUTH_SECRET,
-    },
-    tests: {}
-  };
-
-  try {
-    const db = (process.env as unknown as { DB: D1Database }).DB;
-    if (db) {
-      const start = Date.now();
-      const userCount = await db.prepare("SELECT count(*) as count FROM users").first<{ count: number }>();
-      results.tests.db_query = {
-        success: true,
-        count: userCount?.count,
-        duration: `${Date.now() - start}ms`
-      };
-    }
-  } catch (e: unknown) {
-    const err = e as Error;
-    results.tests.db_query = { success: false, error: err.message };
+  if (!email || !pass) {
+    return NextResponse.json({ error: "Provide email and pass params" });
   }
 
+  const db = (process.env as unknown as { DB: D1Database }).DB;
+
   try {
-    const db = (process.env as unknown as { DB: D1Database }).DB;
-    if (db) {
-      const email = "curtis@printfrenzy.dev";
-      const pass = "admin123";
-      
-      const userQueryResult = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
-        .bind(email)
-        .first();
-      
-      const user = userQueryResult as { email: string; password_hash: string } | null;
-      const edgeHash = await bcrypt.hash(pass, 10);
-      
-      const getHex = (s: string) => Array.from(s).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' ');
+    const userQueryResult = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
+      .bind(email)
+      .first();
+    
+    const user = userQueryResult as { email: string; password_hash: string } | null;
 
-      if (user) {
-        const start = Date.now();
-        const hash = user.password_hash;
-        const cleanHash = hash.trim();
-        const isMatch = await bcrypt.compare(pass, cleanHash);
-        
-        results.tests.live_db_check = {
-          success: true,
-          email: user.email,
-          raw_hash_len: hash.length,
-          last_chars_hex: getHex(hash.slice(-5)),
-          clean_hash_len: cleanHash.length,
-          match: isMatch,
-          duration: `${Date.now() - start}ms`
-        };
-      }
-
-      results.tests.edge_native_check = {
-        message: "COPY THIS HASH TO YOUR DATABASE IF LIVE_DB_CHECK FAILS",
-        pass: pass,
-        generated_hash: edgeHash,
-        hash_len: edgeHash.length,
-        verified_locally: await bcrypt.compare(pass, edgeHash)
-      };
+    if (!user) {
+      return NextResponse.json({ 
+        found: false, 
+        message: "No user found in D1",
+        email_used: email
+      });
     }
-  } catch (e: unknown) {
-    const err = e as Error;
-    results.tests.error = err.message;
-  }
 
-  return NextResponse.json(results);
+    const cleanHash = user.password_hash.trim();
+    const isMatch = await verifyPassword(pass, cleanHash);
+    
+    // Generate a fresh hash for comparison
+    const edgeHash = await hashPassword(pass);
+
+    return NextResponse.json({
+        found: true,
+        email_in_db: user.email,
+        hash_in_db: user.password_hash,
+        hash_length: user.password_hash.length,
+        password_provided: pass,
+        match_result: isMatch,
+        generated_fresh_hash: edgeHash
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message });
+  }
 }

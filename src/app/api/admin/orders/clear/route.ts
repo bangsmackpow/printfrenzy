@@ -1,38 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
-import bcrypt from 'bcryptjs';
+import { verifyPassword } from "@/utils/hashUtils";
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  const userRole = (session?.user as { role?: string })?.role;
-  if (!session || userRole !== 'ADMIN') {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { password } = await req.json();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
   try {
-    // Verify admin password
-    const userEmail = session.user?.email;
-    const adminUser = await db.prepare("SELECT password_hash FROM users WHERE email = ?").bind(userEmail).first() as { password_hash: string } | null;
-    
-    if (!adminUser || !(await bcrypt.compare(password, adminUser.password_hash))) {
-      return NextResponse.json({ error: "Invalid password. Action aborted." }, { status: 401 });
+    const { password } = await req.json();
+    const adminEmail = session.user?.email;
+
+    // Verify admin password before destructive action
+    const adminUser = await db.prepare("SELECT password_hash FROM users WHERE email = ?").bind(adminEmail).first() as { password_hash: string } | null;
+
+    if (!adminUser || !(await verifyPassword(password, adminUser.password_hash))) {
+      return NextResponse.json({ error: "Invalid admin password" }, { status: 401 });
     }
 
-    // Clear both tables
-    await db.batch([
-      db.prepare("DELETE FROM audit_logs"),
-      db.prepare("DELETE FROM orders")
-    ]);
+    // DELETE ALL ORDERS
+    await db.prepare("DELETE FROM orders").run();
+    // DELETE ALL SHIPMENTS
+    await db.prepare("DELETE FROM shipments").run();
 
-    return NextResponse.json({ success: true, message: "System cleared." });
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error("Clear orders error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

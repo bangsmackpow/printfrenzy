@@ -1,45 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/utils/hashUtils";
 
 export const runtime = 'edge';
 
-export async function GET() {
-  const session = await auth();
-  
-  // Basic security check
-  if (!session) {
-    return NextResponse.json({ error: "Not Authenticated" }, { status: 401 });
-  }
-  
-  if ((session.user as { role?: string })?.role !== 'ADMIN') {
-    return NextResponse.json({ error: "Access Denied: Admin role required" }, { status: 403 });
-  }
-
-  const db = (process.env as unknown as { DB: D1Database }).DB;
-  const { results } = await db.prepare("SELECT id, email, role, created_at FROM users").all();
-  return NextResponse.json(results);
-}
-
 export async function POST(req: NextRequest) {
   const session = await auth();
-  
   if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { email, password, role } = await req.json();
   const db = (process.env as unknown as { DB: D1Database }).DB;
-  const id = crypto.randomUUID();
-  const hashedPassword = await bcrypt.hash(password, 10);
 
   try {
+    const { email, password, role } = await req.json();
+
+    if (!email || !password) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    // Check if user exists
+    const existing = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+    if (existing) {
+      return NextResponse.json({ error: "User already exists" }, { status: 400 });
+    }
+
+    const id = crypto.randomUUID();
+    const hashedPassword = await hashPassword(password);
+
     await db.prepare("INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)")
-      .bind(id, email, hashedPassword, role) 
+      .bind(id, email, hashedPassword, role || 'USER')
       .run();
+
     return NextResponse.json({ success: true });
-  } catch (e: unknown) {
-    const error = e as Error;
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  const session = await auth();
+  if (!session || (session.user as { role?: string })?.role !== 'ADMIN') {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const db = (process.env as unknown as { DB: D1Database }).DB;
+
+  try {
+    const results = await db.prepare("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC").all();
+    return NextResponse.json(results.results);
+  } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
