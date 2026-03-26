@@ -24,6 +24,11 @@
 - **Wix Transform Utility**: Automatic surgical replacement of Wix URL segments to convert low-res thumbnails into 1000px+ high-res production assets.
 - **Auto-Casing**: Order descriptions and customer names are automatically converted to uppercase for consistent manifest aesthetics.
 
+### 🔄 5. Wix Real-time Direct Sync (Live)
+- **API Integration**: Replaced manual CSV exports with a "Sync Wix" button that pulls directly from Wix Stores.
+- **Deduplication Logic**: Automatically scans existing orders to prevent duplicates when syncing multiple times.
+- **Instant Processing**: New orders appear immediately in the `RECEIVED` queue with all metadata and variant details.
+
 ---
 
 ## ✅ Database Integrity & Schema
@@ -38,11 +43,13 @@ Ensure these are set in the Cloudflare Pages Dashboard for full functionality:
 - `AUTH_URL`: [OK]
 - `SHIPPO_API_KEY`: [OK]
 - `SHIPPO_SENDER_ADDRESS_JSON`: [OK]
+- `WIX_API_KEY`: [OK] (Wix API Token for real-time sync)
+- `WIX_SITE_ID`: [OK] (Wix Site ID for real-time sync)
 - `BUCKET`: (R2 Binding for design uploads) [OK]
 
 ---
 
 ## ⏳ Next Phase / Ideas
-- **Wix Direct API Sync**: Move from CSV dependence to a real-time "Sync" button.
+- **Automated Tracking Uploads**: Push tracking numbers back to Wix orders automatically after purchase.
 - **Address Validation**: Add automatic address correction to the Shipping Tool.
 - **Barcode Support**: Generate barcodes on the Manifest for scanning/status updates.
