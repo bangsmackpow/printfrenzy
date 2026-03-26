@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Public URL (requires a custom domain or public bucket URL)
-    const publicUrl = `https://assets.builtnetworks.com/${key}`; 
+    const publicUrl = `https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/${key}`; 
 
     return NextResponse.json({ success: true, publicUrl });
   } catch (error: unknown) {
