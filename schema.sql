@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE TABLE IF NOT EXISTS shipments (
     id TEXT PRIMARY KEY,
-    order_number TEXT NOT NULL,
+    order_number TEXT,
     customer_name TEXT,
     street TEXT,
     city TEXT,

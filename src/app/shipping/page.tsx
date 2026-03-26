@@ -18,7 +18,7 @@ interface Shipment {
 }
 
 export default function ShippingPage() {
-  const { data: session, status: authStatus } = useSession();
+  const { status: authStatus } = useSession();
   const router = useRouter();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +43,9 @@ export default function ShippingPage() {
       if (res.ok) {
         setShipments(await res.json());
       }
-    } catch (err) {
-      console.error("Fetch error:", err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("Fetch error:", error.message);
     } finally {
       setLoading(false);
     }
@@ -79,8 +80,9 @@ export default function ShippingPage() {
         } else {
             setFormError(data.error || "Failed to generate label");
         }
-    } catch (err: any) {
-        setFormError(err.message);
+    } catch (err: unknown) {
+        const error = err as Error;
+        setFormError(error.message);
     } finally {
         setIsGenerating(false);
     }
@@ -100,10 +102,10 @@ export default function ShippingPage() {
       <header className="mb-12 flex justify-between items-end">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-3 w-3 bg-green-500 rounded-full"></div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">USPS Logistics Dashboard</p>
+            <div className="h-3 w-3 bg-blue-600 rounded-full animate-pulse"></div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Standalone Logistics Tool</p>
           </div>
-          <h1 className="text-6xl font-black text-slate-900 tracking-tighter italic uppercase">Shipments</h1>
+          <h1 className="text-6xl font-black text-slate-900 tracking-tighter italic uppercase">Shipping Tool</h1>
         </div>
         <div className="flex gap-4">
             <button 
@@ -115,17 +117,17 @@ export default function ShippingPage() {
                 {showForm ? (
                     <>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        Close Form
+                        Minimize Form
                     </>
                 ) : (
                     <>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                        New Shipment
+                        New Label
                     </>
                 )}
             </button>
             <div className="bg-white px-8 py-4 rounded-2xl border border-slate-200 shadow-sm text-center">
-                <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Labels</p>
+                <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Session Total</p>
                 <p className="text-3xl font-black text-slate-900 italic">{shipments.length}</p>
             </div>
         </div>
@@ -135,27 +137,27 @@ export default function ShippingPage() {
           <div className="mb-16 bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-8 flex items-center gap-3">
                   <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                  Standalone USPS Label Generator
+                  USPS Label Generator
               </h2>
               <form onSubmit={handleCreateShipment} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Batch / Order #</label>
-                          <input type="text" required value={formData.order_number} onChange={e => setFormData({...formData, order_number: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="e.g. 12345" />
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Reference / Order # (Optional)</label>
+                          <input type="text" value={formData.order_number} onChange={e => setFormData({...formData, order_number: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase" placeholder="e.g. EXTERNAL-01" />
                       </div>
                       <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Customer Name</label>
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Recipient Name</label>
                           <input type="text" required value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase" placeholder="e.g. JOHN DOE" />
                       </div>
                   </div>
                   <div className="space-y-2">
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Street Address</label>
-                      <input type="text" required value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="123 Main St" />
+                      <input type="text" required value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase" placeholder="123 MAIN ST" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">City</label>
-                          <input type="text" required value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="City" />
+                          <input type="text" required value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase" placeholder="CITY" />
                       </div>
                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">State (ST)</label>
@@ -190,18 +192,18 @@ export default function ShippingPage() {
           <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8 text-slate-300">
             <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
           </div>
-          <h3 className="text-2xl font-black text-slate-900 uppercase italic">No Shipments Found</h3>
-          <p className="text-slate-400 font-bold mt-2">Generate your first USPS label above or from any Order Details page.</p>
+          <h3 className="text-2xl font-black text-slate-900 uppercase italic">No Shipment History</h3>
+          <p className="text-slate-400 font-bold mt-2">Generate a standalone USPS label above for any external package.</p>
         </div>
       ) : (
         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Date / Batch</th>
-                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Customer / Address</th>
-                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Tracking Number</th>
-                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Actions</th>
+                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Date / Reference</th>
+                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Recipient / Destination</th>
+                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest">Tracking Info</th>
+                <th className="p-8 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -209,7 +211,7 @@ export default function ShippingPage() {
                 <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="p-8">
                     <p className="text-xs font-bold text-slate-400 mb-1">{new Date(s.created_at).toLocaleDateString()}</p>
-                    <p className="text-sm font-black text-slate-900 italic">Batch #{s.order_number}</p>
+                    <p className="text-sm font-black text-slate-900 italic uppercase">REF: {s.order_number}</p>
                   </td>
                   <td className="p-8">
                     <p className="text-sm font-black text-slate-900 uppercase mb-1">{s.customer_name}</p>
@@ -221,11 +223,11 @@ export default function ShippingPage() {
                   <td className="p-8">
                     <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl border border-blue-100">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                        <span className="text-xs font-black tracking-tight">{s.tracking_number}</span>
+                        <span className="text-xs font-black tracking-tight uppercase">{s.tracking_number}</span>
                     </div>
                   </td>
-                  <td className="p-8">
-                    <div className="flex gap-2">
+                  <td className="p-8 text-right">
+                    <div className="flex gap-2 justify-end">
                         <a 
                             href={s.label_url} 
                             target="_blank"
@@ -233,12 +235,15 @@ export default function ShippingPage() {
                         >
                             Print Label
                         </a>
-                        <button 
-                            onClick={() => router.push(`/orders/details?order_number=${s.order_number}`)}
-                            className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 rounded-2xl transition-all"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                        </button>
+                        {s.order_number && s.order_number !== 'MANUAL' && (
+                            <button 
+                                onClick={() => router.push(`/orders/details?order_number=${s.order_number}`)}
+                                className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-blue-600 rounded-2xl transition-all group"
+                                title="View Associated Order"
+                            >
+                                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            </button>
+                        )}
                     </div>
                   </td>
                 </tr>

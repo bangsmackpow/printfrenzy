@@ -18,14 +18,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       const shipment = await db.prepare("SELECT tracking_number, label_url FROM shipments WHERE order_number = ? AND customer_name = ? ORDER BY created_at DESC LIMIT 1")
         .bind(orderNumber, customerName).first();
       return NextResponse.json({ shipment });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+      const error = e as Error;
+      return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   // 2. GET /api/shipping (List all)
   try {
     const results = await db.prepare("SELECT * FROM shipments ORDER BY created_at DESC LIMIT 100").all();
     return NextResponse.json(results.results);
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  } catch (e: unknown) { 
+    const error = e as Error;
+    return NextResponse.json({ error: error.message }, { status: 500 }); 
+  }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
@@ -43,6 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     try {
       const body = await req.json();
       const { order_number, customer_name, street, city, state, zip } = body;
+      const finalOrderNumber = order_number || 'MANUAL';
 
       const senderAddress = process.env.SHIPPO_SENDER_ADDRESS_JSON 
         ? JSON.parse(process.env.SHIPPO_SENDER_ADDRESS_JSON) 
@@ -61,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const rates = shipment.rates;
       if (!rates || rates.length === 0) return NextResponse.json({ error: "No rates" }, { status: 400 });
 
-      const uspsRates = rates.filter((r: any) => r.provider === 'USPS');
+      const uspsRates = rates.filter((r: { provider: string }) => r.provider === 'USPS');
       const selectedRate = uspsRates.length > 0 ? uspsRates[0] : rates[0];
 
       // Purchase Label
@@ -70,14 +77,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ rate: selectedRate.object_id, label_file_type: "PDF", async: false })
       });
-      const transaction = await tRes.json();
+      const transaction = await tRes.json() as { status: string; tracking_number: string; label_url: string };
       if (transaction.status !== 'SUCCESS') return NextResponse.json({ error: "Purchase failed" }, { status: 400 });
 
       await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(crypto.randomUUID(), order_number, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();
+        .bind(crypto.randomUUID(), finalOrderNumber, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();
 
       return NextResponse.json({ success: true, tracking_number: transaction.tracking_number, label_url: transaction.label_url });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
