@@ -22,6 +22,19 @@ export default function ShippingPage() {
   const router = useRouter();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // New Shipment Form State
+  const [showForm, setShowForm] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formData, setFormData] = useState({
+    order_number: '',
+    customer_name: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: ''
+  });
 
   const fetchShipments = useCallback(async () => {
     setLoading(true);
@@ -45,6 +58,34 @@ export default function ShippingPage() {
     }
   }, [authStatus, router, fetchShipments]);
 
+  const handleCreateShipment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsGenerating(true);
+    setFormError("");
+
+    try {
+        const res = await fetch('/api/shipping/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            setShowForm(false);
+            setFormData({ order_number: '', customer_name: '', street: '', city: '', state: '', zip: '' });
+            fetchShipments();
+            // Open label in new tab
+            if (data.label_url) window.open(data.label_url, '_blank');
+        } else {
+            setFormError(data.error || "Failed to generate label");
+        }
+    } catch (err: any) {
+        setFormError(err.message);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   if (authStatus === 'loading' || loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
@@ -64,19 +105,93 @@ export default function ShippingPage() {
           </div>
           <h1 className="text-6xl font-black text-slate-900 tracking-tighter italic uppercase">Shipments</h1>
         </div>
-        <div className="bg-white px-8 py-4 rounded-2xl border border-slate-200 shadow-sm text-center">
-            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Labels</p>
-            <p className="text-3xl font-black text-slate-900 italic">{shipments.length}</p>
+        <div className="flex gap-4">
+            <button 
+                onClick={() => setShowForm(!showForm)}
+                className={`px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg flex items-center gap-3 ${
+                    showForm ? 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-50' : 'bg-slate-900 text-white hover:bg-blue-600 shadow-blue-100'
+                }`}
+            >
+                {showForm ? (
+                    <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        Close Form
+                    </>
+                ) : (
+                    <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                        New Shipment
+                    </>
+                )}
+            </button>
+            <div className="bg-white px-8 py-4 rounded-2xl border border-slate-200 shadow-sm text-center">
+                <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Labels</p>
+                <p className="text-3xl font-black text-slate-900 italic">{shipments.length}</p>
+            </div>
         </div>
       </header>
 
-      {shipments.length === 0 ? (
+      {showForm && (
+          <div className="mb-16 bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-300">
+              <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-8 flex items-center gap-3">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                  Standalone USPS Label Generator
+              </h2>
+              <form onSubmit={handleCreateShipment} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Batch / Order #</label>
+                          <input type="text" required value={formData.order_number} onChange={e => setFormData({...formData, order_number: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="e.g. 12345" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Customer Name</label>
+                          <input type="text" required value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase" placeholder="e.g. JOHN DOE" />
+                      </div>
+                  </div>
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Street Address</label>
+                      <input type="text" required value={formData.street} onChange={e => setFormData({...formData, street: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="123 Main St" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">City</label>
+                          <input type="text" required value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all" placeholder="City" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">State (ST)</label>
+                          <input type="text" required maxLength={2} value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center uppercase" placeholder="IA" />
+                      </div>
+                      <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">ZIP Code</label>
+                          <input type="text" required value={formData.zip} onChange={e => setFormData({...formData, zip: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center" placeholder="50801" />
+                      </div>
+                  </div>
+                  
+                  {formError && <p className="text-red-500 text-[10px] font-black uppercase px-2">{formError}</p>}
+                  
+                  <button 
+                    type="submit" 
+                    disabled={isGenerating}
+                    className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {isGenerating ? (
+                        <>
+                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Purchasing Label...
+                        </>
+                    ) : 'Generate & Purchase USPS Label'}
+                  </button>
+              </form>
+          </div>
+      )}
+
+      {shipments.length === 0 && !showForm ? (
         <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-32 text-center">
           <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8 text-slate-300">
             <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
           </div>
           <h3 className="text-2xl font-black text-slate-900 uppercase italic">No Shipments Found</h3>
-          <p className="text-slate-400 font-bold mt-2">Generate your first USPS label from any Order Details page.</p>
+          <p className="text-slate-400 font-bold mt-2">Generate your first USPS label above or from any Order Details page.</p>
         </div>
       ) : (
         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden">
@@ -105,7 +220,7 @@ export default function ShippingPage() {
                   </td>
                   <td className="p-8">
                     <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2 rounded-xl border border-blue-100">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                         <span className="text-xs font-black tracking-tight">{s.tracking_number}</span>
                     </div>
                   </td>
