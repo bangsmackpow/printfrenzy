@@ -13,7 +13,7 @@ export default function NewOrderPage() {
     image_url: '',
     quantity: 1
   });
-  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
