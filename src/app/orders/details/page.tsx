@@ -69,8 +69,19 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
             });
             const data = await res.json();
             if (res.ok) {
-                setRates(data.rates || []);
-                if (data.rates?.length > 0) setSelectedRateId(data.rates[0].object_id);
+                if (data.rates && data.rates.length > 0) {
+                    const gaRate = data.rates.find((r: Rate) => r.servicelevel.token === 'usps_ground_advantage');
+                    if (gaRate) {
+                        const filtered = data.rates.filter((r: Rate) => 
+                            r.object_id === gaRate.object_id || parseFloat(r.amount) < parseFloat(gaRate.amount)
+                        );
+                        setRates(filtered.sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount)));
+                        setSelectedRateId(gaRate.object_id);
+                    } else {
+                        setRates(data.rates.sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount)));
+                        setSelectedRateId(data.rates[0].object_id);
+                    }
+                }
             } else {
                 setError(data.error || "Failed to fetch rates");
             }

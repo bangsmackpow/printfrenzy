@@ -71,7 +71,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const sRes = await fetch('https://api.goshippo.com/shipments/', {
         method: 'POST',
         headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address_from: senderAddress, address_to: toAddress, parcels: [parcel], async: false })
+        body: JSON.stringify({ 
+          address_from: senderAddress, 
+          address_to: toAddress, 
+          parcels: [parcel], 
+          extra: { postage_price_on_label: false },
+          async: false 
+        })
       });
       const shipment = await sRes.json();
       const allRates = (shipment.rates || []);
