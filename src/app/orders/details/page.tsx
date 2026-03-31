@@ -427,10 +427,17 @@ function DetailContent() {
 
                     <div className="mt-8 pt-8 border-t border-slate-100 flex gap-2">
                       <button
+                        onClick={() => router.push(`/orders/${row.id}/edit`)}
+                        className="px-6 py-4 bg-white border border-slate-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:border-blue-200 hover:bg-blue-50 transition-all flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        Modify
+                      </button>
+                      <button
                         onClick={() => updateStatus(row.id, row.status)}
                         className="flex-grow py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-blue-100"
                       >
-                        Push to Next Stage
+                        Forward
                       </button>
                       {isAdmin && (
                         <button
