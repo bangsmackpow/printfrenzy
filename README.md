@@ -40,6 +40,7 @@ Protecting the production data and team access:
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
 - **Production Print Manifest**: Dedicated sidebar view for generating high-resolution manifests and specialized urgent notes pages.
+- **Order Modification**: Full editing suite for correcting customer data, product variants, quantities, and production artwork for both manual and imported jobs.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.

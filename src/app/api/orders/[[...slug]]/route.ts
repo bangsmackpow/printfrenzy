@@ -65,7 +65,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     }
   }
 
-  // 2. Default: GET /api/orders
+  // 2. GET /api/orders/single?id=...
+  if (slug?.[0] === 'single') {
+    const id = searchParams.get('id');
+    try {
+      if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+      const result = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first();
+      return NextResponse.json(result);
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
+  }
+
+  // 3. Default: GET /api/orders
   try {
     const results = await db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
     return NextResponse.json(results.results);
@@ -254,6 +267,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { order_number, customer_name, product_name, variant, image_url, quantity } = await req.json();
       await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
         .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, quantity || 1).run();
+      return NextResponse.json({ success: true });
+    } catch (e: unknown) { 
+        const error = e as Error;
+        return NextResponse.json({ error: error.message }, { status: 500 }); 
+    }
+  }
+
+  // 8. POST /api/orders/update
+  if (slug?.[0] === 'update') {
+    try {
+      const { id, order_number, customer_name, product_name, variant, image_url, quantity } = await req.json();
+      if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+      await db.prepare("UPDATE orders SET order_number = ?, customer_name = ?, product_name = ?, variant = ?, image_url = ?, quantity = ? WHERE id = ?")
+        .bind(order_number, customer_name, product_name, variant, image_url, quantity, id).run();
+      
+      // Log the update
+      await db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")
+        .bind(id, session?.user?.email || "SYSTEM", `Updated order details`).run();
+
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
         const error = e as Error;

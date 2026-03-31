@@ -1,8 +1,14 @@
 # Project Status - PrintFrenzy
 
-## 🚀 Recent Major Updates (March 26, 2026)
+## 🚀 Recent Major Updates (March 31, 2026)
 
-### 1. 📦 Standalone Shipping Tool (Live)
+### 1. ✏️ Order Modification Suite (Live)
+- **Universal Editing**: Added full support for modifying any order field (Customer Name, Product, Variant, Quantity) directly from the dashboard.
+- **Artwork Swap**: Ability to re-upload design files to R2 or paste new artwork URLs for existing orders.
+- **Audit Logging**: Every manual modification is recorded in the `audit_logs` table with the user's email and timestamp for accountability.
+- **Dashboard Hooks**: Quick-access floating pencil icons on every order card.
+
+### 2. 📦 Standalone Shipping Tool (Live)
 - **Carrier Integration**: Full USPS rate shopping and label purchasing via Shippo API.
 - **Auto-Address Tracking**: Remembers previously used shipping addresses per customer to speed up label generation.
 - **Tracking History**: Dedicated `shipments` table stores tracking numbers and label URLs for audit trails and returns.

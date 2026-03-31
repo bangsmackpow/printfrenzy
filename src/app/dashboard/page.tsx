@@ -301,6 +301,14 @@ function DashboardContent() {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                       </button>
 
+                      {/* Edit Button */}
+                      <button 
+                        onClick={() => router.push(`/orders/${item.id}/edit`)}
+                        className="absolute top-4 right-4 z-10 h-8 w-8 rounded-xl bg-white/90 backdrop-blur shadow-md text-slate-300 opacity-0 group-hover:opacity-100 rotate-12 group-hover:rotate-0 hover:text-blue-600 hover:scale-110 transition-all flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      </button>
+
                       {/* Image Container */}
                       <div className="aspect-square relative overflow-hidden bg-slate-50 group-hover:bg-blue-50 transition-colors">
                         <Image 
