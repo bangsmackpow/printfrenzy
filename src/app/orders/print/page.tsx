@@ -22,6 +22,7 @@ interface Order {
 function PrintContent() {
   const [items, setItems] = useState<Order[]>([]);
   const searchParams = useSearchParams();
+  const orderNumber = searchParams.get('order_number');
   const customerFilter = searchParams.get('customer');
 
   const fetchDetails = useCallback(async () => {
@@ -40,7 +41,7 @@ function PrintContent() {
     } catch (err) {
       console.error("Print fetch error:", err);
     }
-  }, [orderNumber]);
+  }, [orderNumber, customerFilter]);
 
   useEffect(() => {
     fetchDetails();

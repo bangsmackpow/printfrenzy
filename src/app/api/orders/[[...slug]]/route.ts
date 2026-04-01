@@ -43,6 +43,9 @@ function parseCSV(text: string) {
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
