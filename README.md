@@ -13,6 +13,16 @@ The goal of this application is to minimize the "clicks-to-print" ratio:
 - **Manual Orders**: Drag-and-drop design uploads directly to Cloudflare R2 for off-platform or custom jobs.
 - **Accountability**: Real-time logging of exactly which staff member moved which design through the production pipeline.
 
+### 🔔 Live Notifications
+- **Stage Subscriptions**: Subscribe to any production stage (RECEIVED → COMPLETED) and get instant popup notifications when someone moves an order into your watched stage.
+- **Polling-Based**: Checks for new notifications every 5 seconds — no WebSocket infrastructure needed.
+- **Click-to-Navigate**: Click any notification toast to jump directly to that order's new stage in the queue.
+
+### 📋 Audit Log
+- **Complete History**: Every status change, order edit, note update, deletion, and system clear is logged with who did it, when, and what changed.
+- **Filterable UI**: Filter by action type (Status Change, Order Edit, Notes Update, Delete, System Clear) and by user.
+- **Admin/Manager Access**: Accessible via the "Audit Log" link in the sidebar.
+
 ### 🔐 Security & Management
 Protecting the production data and team access:
 - **Password Management**: Self-service user resets and admin-initiated password resets for all staff.
@@ -31,7 +41,7 @@ Protecting the production data and team access:
 
 ### 📅 Current Development Progress
 ✅ **Completed**:
-- **Database Schema**: Unified tables for `users`, `orders`, and `audit_logs`. Added `shipments` table.
+- **Database Schema**: Unified tables for `users`, `orders`, `audit_logs`, `shipments`, `notification_subscriptions`, and `notifications`.
 - **Auth Engine**: Switched to `@auth/nextjs (v5)` to support Next.js 16 on the Edge.
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
 - **Production Print Manifest**: A dedicated sidebar tab for generating global, high-resolution print manifests for all orders in the "PRINTING" stage.
@@ -39,7 +49,7 @@ Protecting the production data and team access:
 - **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing.
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
-- **Order Sheets (v2)**: Formerly "Production Print," now a universal manifest generation tool accessible from any order detail page. Supports urgent notes, one-part-per-page layouts, and massive font sizes for personalization.
+- **Order Sheets (v3)**: Per-batch selection interface — pick which batches to print. Each item prints on its own page as a compact packing slip with product image, variant, personalization, and QC sign-off checkboxes.
 - **Multi-Theme Experience**: Native support for Light, Dark, and High-Contrast Polarized modes. Theme preferences are persistent per user and sync across all logged-in devices.
 - **Staging Workflow**: Added a mandatory "STAGING" step between production and shipping to ensure physical inventory matches digital batches.
 - **Automated Security**: Gitleaks, Semgrep, and Trivy run on every push to detect secrets, logic flaws, and dependency vulnerabilities.
@@ -48,6 +58,8 @@ Protecting the production data and team access:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.
 - **Barcode Support**: Direct scanning of manifests to trigger movement through the production stages.
 - **Live Dispatch Dashboard**: Real-time status updates across different production workstations.
+- **Email Notifications**: Extend the notification system to send email alerts for critical stage transitions.
+- **Barcode Support**: Direct scanning of packing slips to trigger movement through the production stages.
 
 
 ---
