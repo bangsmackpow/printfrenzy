@@ -89,6 +89,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }
   }
 
+  // 4. POST /api/admin/users/email (Update user login)
+  if (slug?.[0] === 'users' && slug?.[1] === 'email') {
+    try {
+        const { id, email } = await req.json();
+        if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
+        await db.prepare("UPDATE users SET email = ? WHERE id = ?").bind(email, id).run();
+        return NextResponse.json({ success: true });
+    } catch (e: unknown) { 
+        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
+  }
+
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
 }
 

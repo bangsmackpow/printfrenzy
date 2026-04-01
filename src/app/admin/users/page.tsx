@@ -131,6 +131,19 @@ export default function AdminUsersPage() {
                   </span>
                 </td>
                 <td className="p-6 flex gap-4 items-center">
+                  <button onClick={() => {
+                    const newEmail = prompt("Enter new email for this user:", u.email);
+                    if (newEmail && newEmail !== u.email) {
+                      fetch('/api/admin/users/email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: u.id, email: newEmail }),
+                      }).then(res => {
+                        if (res.ok) fetchUsers();
+                        else alert("Failed to update email");
+                      });
+                    }
+                  }} className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Edit Email</button>
                   <button onClick={() => resetPassword(u.id)} className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:underline">Reset Password</button>
                   <button onClick={() => handleDelete(u.id)} className="text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 transition-colors">Remove</button>
                 </td>

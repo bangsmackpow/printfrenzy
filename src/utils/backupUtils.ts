@@ -45,9 +45,9 @@ export async function archiveOrderToR2(db: D1Database, bucket: R2Bucket, orderId
       }
     } as any); 
 
-    console.log(`Archived order ${orderId} to R2: ${key}`);
+    console.log("Archived order to R2:", { orderId, key });
   } catch (error) {
-    console.error(`Failed to archive order ${orderId}:`, error);
+    console.error("Failed to archive order to R2:", { orderId, error });
   }
 }
 
@@ -70,7 +70,7 @@ export async function createFullDatabaseBackup(db: D1Database, bucket: R2Bucket)
 
     return { key, tableCount: tables.length };
   } catch (error) {
-    console.error("Full database backup failed:", error);
+    console.error("Full database backup failed:", { error });
     throw error;
   }
 }
