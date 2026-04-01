@@ -109,8 +109,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         return NextResponse.json({ error: "Failed to purchase shipping label" }, { status: 400 });
       }
 
+      const shipmentId = crypto.randomUUID();
       await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(crypto.randomUUID(), finalOrderNumber, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();
+        .bind(shipmentId, finalOrderNumber, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();
+
+      const userEmail = session?.user?.email || "SYSTEM";
+      await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'SHIPMENT_CREATED', 'Shipping label purchased', ?)")
+        .bind(null, finalOrderNumber, userEmail, JSON.stringify({
+          tracking_number: transaction.tracking_number,
+          destination: `${customer_name}, ${street}, ${city}, ${state} ${zip}`,
+          label_url: transaction.label_url
+        })).run();
 
       return NextResponse.json({ success: true, tracking_number: transaction.tracking_number, label_url: transaction.label_url });
     } catch (e: unknown) { return sanitizeError(e); }

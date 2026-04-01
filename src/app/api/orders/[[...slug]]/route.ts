@@ -241,59 +241,75 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }
 
     try {
-        const wRes = await fetch('https://www.wixapis.com/stores/v2/orders/query', {
-            method: 'POST',
-            headers: {
-                'Authorization': WIX_API_KEY,
-                'wix-site-id': WIX_SITE_ID,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                query: {
-                    filter: { "status": "PAID" },
-                    sort: [{ "field": "number", "order": "DESC" }],
-                    paging: { limit: 20 }
-                }
-            })
-        });
-
-        if (!wRes.ok) {
-            console.error("Wix API error:", wRes.status, await wRes.text());
-            return NextResponse.json({ error: "Failed to sync with Wix" }, { status: wRes.status });
-        }
-
-        const { orders } = await wRes.json();
         let addedCount = 0;
         let skippedCount = 0;
+        let cursor: string | null = null;
+        const maxPages = 5;
+        let pageCount = 0;
 
-        for (const order of (orders || [])) {
-            const orderNumber = order.number.toString();
-            const customerName = (order.billingInfo?.address?.fullName || order.billingInfo?.contactDetails?.firstName + " " + order.billingInfo?.contactDetails?.lastName || "Unknown").toUpperCase();
-            
-            for (const item of (order.lineItems || [])) {
-                const productName = (item.name || "Product").toUpperCase();
-                const variant = (item.description || "").trim().toUpperCase();
-                const imageUrl = item.image;
-                const qty = item.quantity || 1;
-                const orderedAt = order._createdDate;
+        while (pageCount < maxPages) {
+            const paging: Record<string, unknown> = { limit: 50 };
+            if (cursor) paging.cursor = cursor;
 
-                const existing = await db.prepare("SELECT id FROM orders WHERE order_number = ? AND customer_name = ? AND product_name = ? AND variant = ? AND quantity = ?")
-                    .bind(orderNumber, customerName, productName, variant, qty).first();
+            const wRes = await fetch('https://www.wixapis.com/stores/v2/orders/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': WIX_API_KEY,
+                    'wix-site-id': WIX_SITE_ID,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: {
+                        filter: { "status": "PAID" },
+                        sort: [{ "field": "number", "order": "DESC" }],
+                        paging
+                    }
+                })
+            });
 
-                if (existing) {
-                    skippedCount++;
-                    continue;
-                }
+            if (!wRes.ok) {
+                console.error("Wix API error:", wRes.status, await wRes.text());
+                return NextResponse.json({ error: "Failed to sync with Wix" }, { status: wRes.status });
+            }
 
-                if (imageUrl) {
-                    await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
-                        .bind(crypto.randomUUID(), orderNumber, customerName, productName, variant, imageUrl, orderedAt, qty).run();
-                    addedCount++;
+            const data = await wRes.json();
+            const orders = data.orders || [];
+
+            for (const order of orders) {
+                const orderNumber = order.number.toString();
+                const customerName = (order.billingInfo?.address?.fullName || order.billingInfo?.contactDetails?.firstName + " " + order.billingInfo?.contactDetails?.lastName || "Unknown").toUpperCase();
+                
+                for (const item of (order.lineItems || [])) {
+                    const productName = (item.name || "Product").toUpperCase();
+                    const variant = (item.description || "").trim().toUpperCase();
+                    const imageUrl = item.image;
+                    const qty = item.quantity || 1;
+                    const orderedAt = order._createdDate;
+
+                    const existing = await db.prepare("SELECT id FROM orders WHERE order_number = ? AND customer_name = ? AND product_name = ? AND variant = ? AND quantity = ?")
+                        .bind(orderNumber, customerName, productName, variant, qty).first();
+
+                    if (existing) {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (imageUrl) {
+                        await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
+                            .bind(crypto.randomUUID(), orderNumber, customerName, productName, variant, imageUrl, orderedAt, qty).run();
+                        addedCount++;
+                    }
                 }
             }
+
+            pageCount++;
+            const pagingMetadata = data.pagingMetadata;
+            cursor = pagingMetadata?.next || null;
+
+            if (!cursor) break;
         }
 
-        return NextResponse.json({ success: true, added: addedCount, skipped: skippedCount });
+        return NextResponse.json({ success: true, added: addedCount, skipped: skippedCount, pages: pageCount });
     } catch (e: unknown) { return sanitizeError(e); }
   }
 

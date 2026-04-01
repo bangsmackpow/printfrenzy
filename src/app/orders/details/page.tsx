@@ -48,6 +48,17 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
     const [rates, setRates] = useState<Rate[]>([]);
     const [selectedRateId, setSelectedRateId] = useState<string>("");
     const [showAllRates, setShowAllRates] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const copyLabelUrl = async (url: string) => {
+        try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch (err) {
+            console.error("Failed to copy:", err);
+        }
+    };
 
     useEffect(() => {
         fetch(`/api/shipping/status?order_number=${orderNumber}&customer_name=${encodeURIComponent(customerName)}`)
@@ -133,6 +144,23 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         </a>
                     </div>
+                    <button
+                        onClick={() => shipment.label_url && copyLabelUrl(shipment.label_url)}
+                        className="mt-2 text-[9px] font-bold text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1"
+                        title="Copy label URL"
+                    >
+                        {copied ? (
+                            <>
+                                <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                <span className="text-green-600">Copied!</span>
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                Copy Label URL
+                            </>
+                        )}
+                    </button>
                 </div>
                 <a href={shipment.label_url} target="_blank" className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-blue-100">Print Label</a>
             </div>

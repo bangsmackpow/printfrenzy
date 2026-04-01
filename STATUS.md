@@ -1,6 +1,35 @@
 # Project Status - PrintFrenzy
 
-## 🚀 Recent Major Updates (April 1, 2026)
+## 🚀 Recent Major Updates (April 1, 2026 — Session 2)
+
+### 7. 📋 Copy Label URL to Clipboard (Live)
+- **Quick Copy Button**: Added clipboard icon button next to "Print Label" on both the Shipping Tool page and Order Details page.
+- **One-Click Copy**: Uses `navigator.clipboard.writeText()` to copy the label URL instantly.
+- **Visual Confirmation**: Shows "Copied!" with green checkmark for 1.5 seconds after clicking.
+- **Use Case**: Easily paste label URLs into external tools, customer emails, or tracking systems.
+
+### 8. 🔗 Wix Webhook Integration (Live)
+- **Real-Time Order Ingestion**: `/api/webhooks/wix` endpoint receives order created/updated events from Wix in real-time.
+- **HMAC-SHA256 Verification**: Validates `X-Wix-Signature` header using `WIX_WEBHOOK_SECRET` env var with constant-time comparison.
+- **Automatic Dedup**: Checks existing orders before inserting to prevent duplicates.
+- **No Manual Sync Needed**: Orders appear in the `RECEIVED` queue immediately when customers checkout on Wix.
+- **Setup Required**: Configure webhook URL and secret in Wix dashboard → Settings → Webhooks.
+
+### 9. 📄 Wix Sync Pagination (Live)
+- **Cursor-Based Pagination**: Replaced hardcoded 20-order limit with 50 orders per page, up to 5 pages (250 orders max per sync).
+- **Continuation Tokens**: Uses Wix `pagingMetadata.next` cursor to fetch all pending orders.
+- **Efficient Sync**: Fetches only what's needed, stops when no more pages exist.
+- **Response Enhancement**: Returns `pages` count in sync response for visibility.
+
+### 10. 📦 Shipping Audit Log Entries (Live)
+- **Label Purchase Tracking**: Every shipping label purchase now creates an `audit_logs` entry with `SHIPMENT_CREATED` action type.
+- **Rich Details**: Captures tracking number, destination address, label URL, and user email (who purchased it).
+- **Audit UI Integration**: Green "Label Purchase" badge in `/admin/audit` with tracking number and destination display.
+- **Accountability**: Tracks who bought which label and when — critical for multi-user environments.
+
+---
+
+## 🚀 Recent Major Updates (April 1, 2026 — Session 1)
 
 ### 1. 🔔 Stage Subscription Notifications (Live)
 - **Subscribe to Stages**: Users can subscribe to any production stage (RECEIVED → COMPLETED) via the bell icon in the dashboard header.
@@ -103,3 +132,6 @@ The live production database has been verified and matches the current codebase 
 - **Automated Tracking Uploads**: Push tracking numbers back to Wix orders automatically after purchase.
 - **Barcode Support**: Generate barcodes on packing slips for scanning/status updates.
 - **Email Notifications**: Extend the notification system to send email alerts for critical stage transitions.
+- **Multi-Image Wix/CSV Import**: Add `image_url2-4` support to Wix sync and CSV import (currently only manual orders).
+- **Webhook Retry Handling**: Add retry logic for failed webhook deliveries from Wix.
+- **Scheduled Sync Fallback**: Add cron-based sync as backup if webhooks fail.

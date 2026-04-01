@@ -22,6 +22,7 @@ const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string; bgColor
   NOTES_UPDATE: { label: 'Notes Update', color: 'text-purple-700', bgColor: 'bg-purple-50', borderColor: 'border-purple-100' },
   ORDER_DELETE: { label: 'Order Delete', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-100' },
   SYSTEM_CLEAR: { label: 'System Clear', color: 'text-orange-700', bgColor: 'bg-orange-50', borderColor: 'border-orange-100' },
+  SHIPMENT_CREATED: { label: 'Label Purchase', color: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-100' },
 };
 
 export default function AuditAdmin() {
@@ -163,6 +164,9 @@ export default function AuditAdmin() {
                         detailsText = `Order #${details.order_number || 'Unknown'}`;
                       } else if (log.action_type === 'SYSTEM_CLEAR') {
                         detailsText = `${details.orders_cleared} orders cleared`;
+                      } else if (log.action_type === 'SHIPMENT_CREATED') {
+                        detailsText = details.tracking_number || 'Label purchased';
+                        detailsExtra = details.destination;
                       } else {
                         detailsText = log.action;
                       }
