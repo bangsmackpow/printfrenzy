@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT DEFAULT 'USER', -- 'ADMIN', 'USER'
+    theme TEXT DEFAULT 'light',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -22,7 +22,7 @@ interface Order {
 function PrintContent() {
   const [items, setItems] = useState<Order[]>([]);
   const searchParams = useSearchParams();
-  const orderNumber = searchParams.get('order_number');
+  const customerFilter = searchParams.get('customer');
 
   const fetchDetails = useCallback(async () => {
     try {
@@ -31,7 +31,11 @@ function PrintContent() {
         : `/api/orders/details`;
       const res = await fetch(url);
       if (res.ok) {
-        setItems(await res.json());
+        let data = await res.json();
+        if (customerFilter) {
+            data = data.filter((item: any) => item.customer_name === customerFilter);
+        }
+        setItems(data);
       }
     } catch (err) {
       console.error("Print fetch error:", err);
@@ -72,7 +76,7 @@ function PrintContent() {
         {/* Manifest Header */}
         <div className="border-b-8 border-black pb-10 flex justify-between items-end">
           <div>
-            <h1 className="text-7xl font-black uppercase tracking-tighter italic">Production Manifest</h1>
+            <h1 className="text-7xl font-black uppercase tracking-tighter italic">Order Sheets</h1>
             <p className="text-2xl font-bold mt-3 flex items-center gap-4 text-slate-500">
                 <span>{orderNumber ? `Batch #${orderNumber}` : "Global Print Queue"}</span>
                 <span className="h-2 w-2 bg-slate-300 rounded-full"></span>
@@ -219,7 +223,7 @@ function PrintContent() {
           className="bg-black text-white px-12 py-6 rounded-full font-black uppercase tracking-widest hover:scale-105 transition-all shadow-2xl text-lg flex items-center gap-4 mx-auto"
         >
           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
-          Launch Production Print Run
+          Print Order Sheets
         </button>
       </div>
       

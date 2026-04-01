@@ -35,27 +35,35 @@
 - **Deduplication Logic**: Automatically scans existing orders to prevent duplicates when syncing multiple times.
 - **Instant Processing**: New orders appear immediately in the `RECEIVED` queue with all metadata and variant details.
 
+### 6. 🎨 Multi-Theme System (Live)
+- **Four Distinct Modes**: `light`, `dark`, `polarized-light`, and `polarized-dark`.
+- **User Persistence**: Theme preferences are saved per-user in the database, syncing across devices.
+- **Polarization Support**: Forced square-edge high-contrast mode for professional production environments.
+- **Micro-Animations**: Smooth HSL transitions across all UI components.
+
+### 7. 🏗️ Staging Workflow Integration
+- **New Status: STAGING**: Added a critical verification step between `PRINTING` and `PRODUCTION`.
+- **Batch Verification**: Ensures all multi-item orders are physically accounted for before final assembly.
+- **Dashboard Filters**: dedicated `STAGING` queue for production managers.
+
+### 8. 📜 Universal Order Sheets
+- **Feature Rebrand**: Formerly "Production Print," now "Order Sheets" for broader utility.
+- **Accessible Everywhere**: Fixed-position print buttons added above every shipping block for instant manifest generation.
+- **Customer Filtering**: Ability to print sheets for a single customer within a multi-order batch.
+
+### 9. 🛡️ Automated Security Audit
+- **Pipeline Integration**: Gitleaks (secrets), Semgrep (vulnerabilities), and Trivy (dependencies) run on every push.
+- **SARIF Uploads**: Instant feedback in the GitHub Security Dashboard.
+
 ---
 
 ## ✅ Database Integrity & Schema
 The live production database has been verified and matches the current codebase exactly. 
-No further migrations are required at this time.
 - **Tables**: `users`, `orders`, `audit_logs`, `shipments`.
-- **New Columns**: `notes`, `print_name`, `ordered_at`, `quantity` are all active.
-
-## 🔑 Environment Variables check
-Ensure these are set in the Cloudflare Pages Dashboard for full functionality:
-- `AUTH_SECRET`: [OK]
-- `AUTH_URL`: [OK]
-- `SHIPPO_API_KEY`: [OK]
-- `SHIPPO_SENDER_ADDRESS_JSON`: [OK]
-- `WIX_API_KEY`: [OK] (Wix API Token for real-time sync)
-- `WIX_SITE_ID`: [OK] (Wix Site ID for real-time sync)
-- `BUCKET`: (R2 Binding for design uploads) [OK]
-
----
+- **New Columns**: `theme` (users table) is active for personalization.
 
 ## ⏳ Next Phase / Ideas
 - **Automated Tracking Uploads**: Push tracking numbers back to Wix orders automatically after purchase.
-- **Address Validation**: Add automatic address correction to the Shipping Tool.
 - **Barcode Support**: Generate barcodes on the Manifest for scanning/status updates.
+- **Live WebSocket Notifications**: Real-time status updates across different workstations.
+

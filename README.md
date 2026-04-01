@@ -39,13 +39,16 @@ Protecting the production data and team access:
 - **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing.
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
-- **Production Print Manifest**: Dedicated sidebar view for generating high-resolution manifests and specialized urgent notes pages.
-- **Order Modification**: Full editing suite for correcting customer data, product variants, quantities, and production artwork for both manual and imported jobs.
+- **Order Sheets (v2)**: Formerly "Production Print," now a universal manifest generation tool accessible from any order detail page. Supports urgent notes, one-part-per-page layouts, and massive font sizes for personalization.
+- **Multi-Theme Experience**: Native support for Light, Dark, and High-Contrast Polarized modes. Theme preferences are persistent per user and sync across all logged-in devices.
+- **Staging Workflow**: Added a mandatory "STAGING" step between production and shipping to ensure physical inventory matches digital batches.
+- **Automated Security**: Gitleaks, Semgrep, and Trivy run on every push to detect secrets, logic flaws, and dependency vulnerabilities.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.
-- **Audit Reporting**: Summary page for total prints per staff member.
 - **Barcode Support**: Direct scanning of manifests to trigger movement through the production stages.
+- **Live Dispatch Dashboard**: Real-time status updates across different production workstations.
+
 
 ---
 

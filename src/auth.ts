@@ -7,6 +7,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       role: string;
+      theme: string;
     } & DefaultSession["user"]
   }
 }
@@ -24,7 +25,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .bind(email)
             .first();
           
-          const user = userQueryResult as { id: string; email: string; role: string; password_hash: string } | null;
+          const user = userQueryResult as { id: string; email: string; role: string; theme: string; password_hash: string } | null;
 
           if (!user) return null;
 
@@ -32,7 +33,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const isMatch = await verifyPassword(inputPass, user.password_hash);
 
           if (isMatch) {
-            return { id: user.id, email: user.email, role: user.role };
+            return { id: user.id, email: user.email, role: user.role, theme: user.theme || 'light' };
           }
           
           return null;
@@ -47,12 +48,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as { role: string }).role;
+        token.theme = (user as { theme: string }).theme;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.role = token.role as string;
+        session.user.theme = token.theme as string;
       }
       return session;
     },
