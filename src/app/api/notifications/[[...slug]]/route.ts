@@ -3,6 +3,13 @@ import { auth } from "@/auth";
 
 export const runtime = 'edge';
 
+const VALID_STAGES = ['RECEIVED', 'ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED', 'ARCHIVED'];
+
+function sanitizeError(e: unknown): never {
+  if (e instanceof Error) console.error("Notification API error:", e.message);
+  return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
   const session = await auth();
@@ -11,17 +18,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const db = (process.env as unknown as { DB: D1Database }).DB;
   const email = session.user?.email;
 
-  // 1. GET /api/notifications/subscribe - get user's subscriptions
   if (slug?.[0] === 'subscribe') {
     try {
       const results = await db.prepare("SELECT stage FROM notification_subscriptions WHERE user_email = ?").bind(email).all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) {
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 2. GET /api/notifications/poll - get unread notifications
   if (slug?.[0] === 'poll') {
     try {
       const { searchParams } = new URL(req.url);
@@ -39,9 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       
       const results = await db.prepare(query).bind(...bindParams).all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) {
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -55,10 +56,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const db = (process.env as unknown as { DB: D1Database }).DB;
   const email = session.user?.email;
 
-  // 1. POST /api/notifications/subscribe - toggle subscription
   if (slug?.[0] === 'subscribe') {
     try {
       const { stage, subscribe } = await req.json();
+      if (!stage || !VALID_STAGES.includes(stage)) return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
       
       if (subscribe) {
         await db.prepare("INSERT OR IGNORE INTO notification_subscriptions (user_email, stage) VALUES (?, ?)")
@@ -69,12 +70,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       }
       
       return NextResponse.json({ success: true });
-    } catch (e: unknown) {
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 2. POST /api/notifications/read - mark notifications as read
   if (slug?.[0] === 'read') {
     try {
       const { ids } = await req.json();
@@ -89,9 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       }
       
       return NextResponse.json({ success: true });
-    } catch (e: unknown) {
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });

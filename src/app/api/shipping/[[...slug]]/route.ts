@@ -3,6 +3,11 @@ import { auth } from "@/auth";
 
 export const runtime = 'edge';
 
+function sanitizeError(e: unknown): never {
+  if (e instanceof Error) console.error("Shipping API error:", e.message);
+  return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
   const session = await auth();
@@ -11,7 +16,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { searchParams } = new URL(req.url);
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  // 1. GET /api/shipping/status?order_number=...&customer_name=...
   if (slug?.[0] === 'status') {
     const orderNumber = searchParams.get('order_number');
     const customerName = searchParams.get('customer_name');
@@ -21,20 +25,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       const shipment = await db.prepare("SELECT tracking_number, label_url FROM shipments WHERE order_number = ? AND customer_name = ? ORDER BY created_at DESC LIMIT 1")
         .bind(orderNumber, customerName).first();
       return NextResponse.json({ shipment });
-    } catch (e: unknown) { 
-      const error = e as Error;
-      return NextResponse.json({ error: error.message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 2. GET /api/shipping (List all)
   try {
     const results = await db.prepare("SELECT * FROM shipments ORDER BY created_at DESC LIMIT 100").all();
     return NextResponse.json(results.results);
-  } catch (e: unknown) { 
-    const error = e as Error;
-    return NextResponse.json({ error: error.message }, { status: 500 }); 
-  }
+  } catch (e: unknown) { return sanitizeError(e); }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
@@ -44,10 +41,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
-  // 1. POST /api/shipping/rates
   if (slug?.[0] === 'rates') {
     const SHIPPO_API_KEY = process.env.SHIPPO_API_KEY;
-    if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Missing Shippo Key" }, { status: 500 });
+    if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Configuration error" }, { status: 500 });
 
     try {
       const body = await req.json();
@@ -61,7 +57,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         ? JSON.parse(process.env.SHIPPO_SENDER_ADDRESS_JSON) 
         : { name: "Print Frenzy", street1: "123 Main St", city: "Creston", state: "IA", zip: "50801", country: "US", email: "curtis@printfrenzy.dev", phone: "6415551234" };
 
-      // Ensure email/phone exist (USPS requires them)
       if (!senderAddress.email) senderAddress.email = "curtis@printfrenzy.dev";
       if (!senderAddress.phone) senderAddress.phone = "6415551234";
 
@@ -90,15 +85,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const allRates = (shipment.rates || []);
       
       return NextResponse.json({ rates: allRates });
-    } catch (e: unknown) { 
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 2. POST /api/shipping/purchase
   if (slug?.[0] === 'purchase') {
     const SHIPPO_API_KEY = process.env.SHIPPO_API_KEY;
-    if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Missing Shippo Key" }, { status: 500 });
+    if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Configuration error" }, { status: 500 });
 
     try {
       const body = await req.json();
@@ -112,15 +104,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       });
       const transaction = await tRes.json() as { status: string; tracking_number: string; label_url: string };
       
-      if (transaction.status !== 'SUCCESS') return NextResponse.json({ error: "Purchase failed", details: transaction }, { status: 400 });
+      if (transaction.status !== 'SUCCESS') {
+        console.error("Shippo purchase failed:", transaction);
+        return NextResponse.json({ error: "Failed to purchase shipping label" }, { status: 400 });
+      }
 
       await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(crypto.randomUUID(), finalOrderNumber, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();
 
       return NextResponse.json({ success: true, tracking_number: transaction.tracking_number, label_url: transaction.label_url });
-    } catch (e: unknown) { 
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });

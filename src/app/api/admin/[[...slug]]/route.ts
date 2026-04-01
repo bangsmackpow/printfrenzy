@@ -4,6 +4,14 @@ import { hashPassword, verifyPassword } from "@/utils/hashUtils";
 
 export const runtime = 'edge';
 
+const VALID_ROLES = ['ADMIN', 'MANAGER', 'USER'] as const;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function sanitizeError(e: unknown): never {
+  if (e instanceof Error) console.error("Admin API error:", e.message);
+  return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug } = await params;
   const session = await auth();
@@ -14,23 +22,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // 1. GET /api/admin/users
   if (slug?.[0] === 'users') {
     try {
       const results = await db.prepare("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC").all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) { 
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 2. GET /api/admin/audit
   if (slug?.[0] === 'audit') {
     try {
       const { searchParams } = new URL(req.url);
       const actionType = searchParams.get('action_type');
       const userEmail = searchParams.get('user_email');
-      const limit = parseInt(searchParams.get('limit') || '200', 10);
+      const limit = Math.min(parseInt(searchParams.get('limit') || '200', 10), 500);
       
       let query = `
         SELECT al.*, o.customer_name, o.product_name, o.variant
@@ -38,15 +42,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
         LEFT JOIN orders o ON al.order_id = o.id
       `;
       const conditions: string[] = [];
-      const params: (string | number)[] = [];
+      const bindParams: (string | number)[] = [];
       
       if (actionType) {
         conditions.push('al.action_type = ?');
-        params.push(actionType);
+        bindParams.push(actionType);
       }
       if (userEmail) {
         conditions.push('al.user_email = ?');
-        params.push(userEmail);
+        bindParams.push(userEmail);
       }
       
       if (conditions.length > 0) {
@@ -54,23 +58,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       }
       
       query += ' ORDER BY al.timestamp DESC LIMIT ?';
-      params.push(limit);
+      bindParams.push(limit);
       
-      const results = await db.prepare(query).bind(...params).all();
+      const results = await db.prepare(query).bind(...bindParams).all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) { 
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
   
-  // 3. GET /api/admin/audit/users
   if (slug?.[0] === 'audit' && slug?.[1] === 'users') {
     try {
       const results = await db.prepare("SELECT DISTINCT user_email FROM audit_logs WHERE user_email != 'SYSTEM' ORDER BY user_email ASC").all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) {
-      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -86,20 +85,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // 1. POST /api/admin/users
   if (slug?.[0] === 'users') {
     try {
-      const { email, password, role } = await req.json();
+      const { email, password, role: newRole } = await req.json();
+      if (!email || !EMAIL_RE.test(email)) return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+      if (!password || password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+      if (newRole && !VALID_ROLES.includes(newRole)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+
       const hashedPassword = await hashPassword(password);
       await db.prepare("INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)")
-        .bind(crypto.randomUUID(), email, hashedPassword, role || 'USER').run();
+        .bind(crypto.randomUUID(), email, hashedPassword, newRole || 'USER').run();
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { 
-        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 2. POST /api/admin/clear
   if (slug?.[0] === 'clear') {
     try {
       const { password } = await req.json();
@@ -114,33 +113,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("INSERT INTO audit_logs (user_email, action_type, action, details) VALUES (?, 'SYSTEM_CLEAR', 'All orders cleared', ?)")
         .bind(adminEmail, JSON.stringify({ orders_cleared: orderCount.count })).run();
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { 
-        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 3. POST /api/admin/users/password (Reset another user's password)
   if (slug?.[0] === 'users' && slug?.[1] === 'password') {
     try {
         const { id, password } = await req.json();
+        if (!password || password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
         const hashedPassword = await hashPassword(password);
         await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(hashedPassword, id).run();
         return NextResponse.json({ success: true });
-    } catch (e: unknown) { 
-        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
-  // 4. POST /api/admin/users/email (Update user login)
   if (slug?.[0] === 'users' && slug?.[1] === 'email') {
     try {
         const { id, email } = await req.json();
-        if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
+        if (!email || !EMAIL_RE.test(email)) return NextResponse.json({ error: "Invalid email" }, { status: 400 });
         await db.prepare("UPDATE users SET email = ? WHERE id = ?").bind(email, id).run();
         return NextResponse.json({ success: true });
-    } catch (e: unknown) { 
-        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -156,16 +148,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // 1. DELETE /api/admin/users?id=...
   if (slug?.[0] === 'users') {
     try {
       const id = new URL(req.url).searchParams.get('id');
       if (!id) return NextResponse.json({ error: "No ID provided" }, { status: 400 });
       await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { 
-        return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
-    }
+    } catch (e: unknown) { return sanitizeError(e); }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });

@@ -23,7 +23,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const newHash = await hashPassword(newPassword);
       await db.prepare("UPDATE users SET password_hash = ? WHERE email = ?").bind(newHash, email).run();
       return NextResponse.json({ success: true });
-    } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+    } catch (e: unknown) {
+      if (e instanceof Error) console.error("User API error:", e.message);
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });

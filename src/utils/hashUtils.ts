@@ -3,7 +3,7 @@
  * This replaces bcryptjs to keep the bundle size under 3MB on Cloudflare.
  */
 
-const ITERATIONS = 100000;
+const ITERATIONS = 600000;
 const SALT_LEN = 16;
 const KEY_LEN = 32;
 

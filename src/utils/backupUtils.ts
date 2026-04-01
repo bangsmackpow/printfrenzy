@@ -56,12 +56,15 @@ export async function createFullDatabaseBackup(db: D1Database, bucket: R2Bucket)
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backup: Record<string, unknown> = {};
 
-    const tables = ['orders', 'users', 'audit_logs'];
+    const tables = ['orders', 'audit_logs'];
 
     for (const table of tables) {
       const data = await db.prepare(`SELECT * FROM ${table}`).all();
       backup[table] = data.results;
     }
+
+    const usersData = await db.prepare("SELECT id, email, role, theme, created_at FROM users").all();
+    backup.users = usersData.results;
 
     const key = `backups/sql-nightly/db-backup-${timestamp}.json`;
     await bucket.put(key, JSON.stringify(backup, null, 2), {

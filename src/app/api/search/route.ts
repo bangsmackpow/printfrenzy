@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(results.results);
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    if (e instanceof Error) console.error("Search error:", e.message);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
