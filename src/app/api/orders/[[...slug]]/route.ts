@@ -299,11 +299,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (slug?.[0] === 'manual') {
     try {
-      const { order_number, customer_name, product_name, variant, image_url, quantity } = await req.json();
+      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity } = await req.json();
       if (image_url && !isValidHttpsUrl(image_url)) return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
       const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
-      await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
-        .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, qty).run();
+      await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
+        .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty).run();
       return NextResponse.json({ success: true });
     } catch (e: unknown) { return sanitizeError(e); }
   }

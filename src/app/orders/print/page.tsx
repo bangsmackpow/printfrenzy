@@ -13,6 +13,9 @@ interface Order {
   variant: string;
   quantity: number;
   image_url: string;
+  image_url2?: string;
+  image_url3?: string;
+  image_url4?: string;
   status: string;
   created_at: string;
   notes?: string;
@@ -245,15 +248,37 @@ function PrintContent() {
 
                 <div className="p-8 space-y-6">
                   <div className="flex gap-8 items-start">
-                    <div className="w-48 h-48 relative bg-slate-50 border-2 border-slate-100 rounded-2xl flex-shrink-0">
-                      <Image
-                        src={getPrinterQualityImage(item.image_url, true)}
-                        alt="Artwork"
-                        fill
-                        className="object-contain p-4"
-                        unoptimized
-                      />
-                    </div>
+                    {(() => {
+                      const allImages = [item.image_url, item.image_url2, item.image_url3, item.image_url4].filter((img): img is string => Boolean(img));
+                      if (allImages.length <= 1) {
+                        return (
+                          <div className="w-48 h-48 relative bg-slate-50 border-2 border-slate-100 rounded-2xl flex-shrink-0">
+                            <Image
+                              src={getPrinterQualityImage(item.image_url, true)}
+                              alt="Artwork"
+                              fill
+                              className="object-contain p-4"
+                              unoptimized
+                            />
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="w-48 h-48 flex-shrink-0 grid grid-cols-2 grid-rows-2 gap-px bg-slate-200 rounded-2xl overflow-hidden border-2 border-slate-100">
+                          {allImages.slice(0, 4).map((img, idx) => (
+                            <div key={idx} className="relative bg-slate-50">
+                              <Image
+                                src={getPrinterQualityImage(img, true)}
+                                alt={`Artwork ${idx + 1}`}
+                                fill
+                                className="object-contain p-1"
+                                unoptimized
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex-grow space-y-5 pt-2">
                       <div>

@@ -2,15 +2,18 @@
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     order_number TEXT,
-    customer_name TEXT NOT NULL,
-    product_name TEXT NOT NULL,
+    customer_name TEXT,
+    product_name TEXT,
     variant TEXT,
-    image_url TEXT NOT NULL, -- Wix URL or R2 URL
-    status TEXT DEFAULT 'ORDERED', -- 'ORDERED', 'PRINTED', 'COMPLETED'
-    ordered_at TEXT, -- Original order date from CSV
+    image_url TEXT,
+    image_url2 TEXT,
+    image_url3 TEXT,
+    image_url4 TEXT,
+    status TEXT DEFAULT 'RECEIVED',
     quantity INTEGER DEFAULT 1,
     notes TEXT,
     print_name TEXT,
+    ordered_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

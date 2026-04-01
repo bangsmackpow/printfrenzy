@@ -6,6 +6,7 @@ import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { useSession, signOut } from "next-auth/react";
 import Image from 'next/image';
 import { ToastNotifications, useNotifications } from '@/components/ToastNotifications';
+import { ImageLightbox } from '@/components/ImageLightbox';
 
 type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'STAGING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
@@ -16,6 +17,9 @@ interface Order {
   product_name: string;
   variant: string;
   image_url: string;
+  image_url2?: string;
+  image_url3?: string;
+  image_url4?: string;
   status: OrderStatus;
   quantity: number;
   created_at: string;
@@ -33,6 +37,7 @@ function DashboardContent() {
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<OrderStatus | 'ALL'>('RECEIVED');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lightboxImages, setLightboxImages] = useState<string[] | null>(null);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
   const { notifications, dismissNotification, dismissAll, pollNotifications } = useNotifications();
@@ -386,14 +391,45 @@ function DashboardContent() {
 
                       {/* Image Container */}
                       <div className="aspect-square relative overflow-hidden bg-slate-50 group-hover:bg-blue-50 transition-colors">
-                        <Image 
-                          src={getPrinterQualityImage(item.image_url)} 
-                          alt={item.product_name} 
-                          fill 
-                          className="object-contain p-6 group-hover:scale-110 transition-transform duration-700 ease-out"
-                          unoptimized
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        {(() => {
+                          const allImages = [item.image_url, item.image_url2, item.image_url3, item.image_url4].filter((img): img is string => Boolean(img));
+                          if (allImages.length <= 1) {
+                            return (
+                              <div
+                                className="w-full h-full cursor-pointer"
+                                onClick={() => setLightboxImages(allImages.length ? allImages : null)}
+                              >
+                                <Image 
+                                  src={getPrinterQualityImage(item.image_url)} 
+                                  alt={item.product_name} 
+                                  fill 
+                                  className="object-contain p-6 group-hover:scale-110 transition-transform duration-700 ease-out"
+                                  unoptimized
+                                />
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-px bg-slate-100">
+                              {allImages.slice(0, 4).map((img, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative bg-slate-50 cursor-pointer hover:bg-blue-50 transition-colors"
+                                  onClick={() => setLightboxImages(allImages)}
+                                >
+                                  <Image 
+                                    src={getPrinterQualityImage(img)} 
+                                    alt={`${item.product_name} ${idx + 1}`} 
+                                    fill 
+                                    className="object-contain p-1"
+                                    unoptimized
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                       </div>
 
                       {/* Content */}
@@ -450,6 +486,7 @@ function DashboardContent() {
       )}
 
       <ToastNotifications onNotificationClick={handleNotificationClick} />
+      {lightboxImages && <ImageLightbox images={lightboxImages} onClose={() => setLightboxImages(null)} />}
     </div>
   );
 }
