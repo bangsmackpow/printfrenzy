@@ -41,7 +41,7 @@ Protecting the production data and team access:
 
 ### 📅 Current Development Progress
 ✅ **Completed**:
-- **Database Schema**: Unified tables for `users`, `orders`, `audit_logs`, `shipments`, `notification_subscriptions`, and `notifications`.
+- **Database Schema**: Unified tables for `users`, `orders`, `audit_logs`, `shipments`, `notification_subscriptions`, and `notifications`. Orders support up to 4 images (`image_url` through `image_url4`).
 - **Auth Engine**: Switched to `@auth/nextjs (v5)` to support Next.js 16 on the Edge.
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
 - **Production Print Manifest**: A dedicated sidebar tab for generating global, high-resolution print manifests for all orders in the "PRINTING" stage.
@@ -49,10 +49,13 @@ Protecting the production data and team access:
 - **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing.
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
-- **Order Sheets (v3)**: Per-batch selection interface — pick which batches to print. Each item prints on its own page as a compact packing slip with product image, variant, personalization, and QC sign-off checkboxes.
+- **Order Sheets (v3)**: Per-batch selection interface — pick which batches to print. Each item prints on its own page as a compact packing slip with product image(s), variant, personalization, and QC sign-off checkboxes.
+- **Multi-Image Support**: Manual orders support up to 4 artwork images. Displayed as 2x2 quadrants in the queue and on packing slips. Click-to-enlarge lightbox with keyboard navigation.
+- **Universal Search**: Sidebar search bar (⌘K shortcut) searches across all order fields — order number, customer, product, variant, notes, print name, and status.
 - **Multi-Theme Experience**: Native support for Light, Dark, and High-Contrast Polarized modes. Theme preferences are persistent per user and sync across all logged-in devices.
 - **Staging Workflow**: Added a mandatory "STAGING" step between production and shipping to ensure physical inventory matches digital batches.
 - **Automated Security**: Gitleaks, Semgrep, and Trivy run on every push to detect secrets, logic flaws, and dependency vulnerabilities.
+- **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 600k iterations, constant-time API key comparison, CSV import limits, backup hardening.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.

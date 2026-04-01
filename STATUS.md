@@ -24,6 +24,28 @@
 - **QC Sign-Off Checkboxes**: Art OK / Printed / Applied checkboxes on each slip.
 - **Live Item Counter**: Shows how many batches and items are selected.
 
+### 4. 🖼️ Multi-Image Support (Live)
+- **Up to 4 Images per Order**: Manual orders now support uploading or pasting URLs for up to 4 artwork images.
+- **2x2 Quadrant Display**: In the queue and print view, multiple images are shown in a compact 2x2 grid.
+- **Click-to-Enlarge Lightbox**: Click any image or quadrant to open a full-screen lightbox with arrow navigation, thumbnail strip, and keyboard controls (←→, Escape).
+- **Print Integration**: Packing slips display all 4 images in a 2x2 layout per item.
+
+### 5. 🔍 Universal Search (Live)
+- **Sidebar Search Bar**: Positioned under the logo, searches across order number, customer name, product name, variant, notes, print name, and status.
+- **⌘K Shortcut**: Quick-focus the search from anywhere.
+- **Debounced Results**: 250ms debounce with instant dropdown results showing order context and status badges.
+
+### 6. 🔒 Security Hardening (Live)
+- **Error Sanitization**: All API routes return generic "Internal server error" to clients; real errors logged server-side only.
+- **R2 Upload Security**: 10MB limit, MIME whitelist, magic-byte validation, UUID-based storage keys.
+- **Input Validation**: Email format, password min 8 chars, role whitelist, URL validation, positive quantity enforcement.
+- **Bulk Status Limits**: Max 500 items per bulk operation, status enum validation.
+- **CSV Import Limits**: 5MB max file size, 10,000 record cap.
+- **PBKDF2 Hardened**: Increased from 100k to 600k iterations (OWASP recommended).
+- **Constant-Time API Key Comparison**: Timing-safe comparison for import API key.
+- **Backup Hardening**: `password_hash` excluded from full database backups.
+- **CI Fixed**: `npm audit --audit-level=critical` to stop false-positive dev dependency failures.
+
 ---
 
 ## 📋 Historical Updates
