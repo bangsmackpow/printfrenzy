@@ -20,7 +20,7 @@ interface Order {
   print_name?: string;
 }
 
-type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
+type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'STAGING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
 interface Rate {
     object_id: string;
@@ -246,7 +246,8 @@ function DetailContent() {
   const updateStatus = async (orderId: string, currentStatus: OrderStatus, targetStatus?: OrderStatus) => {
     const newStatus = targetStatus || (currentStatus === 'RECEIVED' ? 'ORDERING' : 
                       currentStatus === 'ORDERING' ? 'PRINTING' : 
-                      currentStatus === 'PRINTING' ? 'PRODUCTION' : 
+                      currentStatus === 'PRINTING' ? 'STAGING' : 
+                      currentStatus === 'STAGING' ? 'PRODUCTION' : 
                       currentStatus === 'PRODUCTION' ? 'COMPLETED' : 'ARCHIVED');
 
     try {

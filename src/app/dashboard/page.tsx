@@ -6,7 +6,7 @@ import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { useSession, signOut } from "next-auth/react";
 import Image from 'next/image';
 
-type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
+type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'STAGING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
 interface Order {
   id: string;
@@ -179,7 +179,7 @@ function DashboardContent() {
                 )}
             </button>
             <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 flex gap-1">
-                {(['RECEIVED', 'ORDERING', 'PRINTING', 'PRODUCTION', 'COMPLETED', 'ALL'] as const).map((s) => (
+                {(['RECEIVED', 'ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED', 'ALL'] as const).map((s) => (
                     <button
                         key={s}
                         onClick={() => setFilter(s)}
@@ -204,7 +204,7 @@ function DashboardContent() {
             <p className="text-[10px] font-black uppercase tracking-widest">Selected Items</p>
           </div>
           <div className="flex gap-2">
-            {(['ORDERING', 'PRINTING', 'PRODUCTION', 'COMPLETED'] as OrderStatus[]).map(status => (
+            {(['ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED'] as OrderStatus[]).map(status => (
               <button 
                 key={status}
                 onClick={() => bulkUpdateStatus(status)}
@@ -341,7 +341,7 @@ function DashboardContent() {
                                 </button>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                                {(['PRINTING', 'PRODUCTION', 'COMPLETED'] as const).map((s) => (
+                                {(['PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED'] as const).map((s) => (
                                     <button
                                         key={s}
                                         onClick={() => updateStatus(item.id, s)}
