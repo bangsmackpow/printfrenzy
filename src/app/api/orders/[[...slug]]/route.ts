@@ -148,7 +148,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     try {
       const { orderIds, status } = await req.json();
       const placeholders = orderIds.map(() => '?').join(',');
+      const existingOrders = await db.prepare(`SELECT id, order_number, status FROM orders WHERE id IN (${placeholders})`).bind(...orderIds).all();
       await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds).run();
+      
+      const userEmail = session?.user?.email || "SYSTEM";
+      for (const order of (existingOrders.results as { id: string; order_number: string; status: string }[])) {
+        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
+          .bind(order.id, order.order_number, userEmail, `Status: ${order.status} → ${status}`, JSON.stringify({ from: order.status, to: status })).run();
+      }
+      
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
         const error = e as Error;
@@ -160,7 +168,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'status') {
     try {
       const { id, status } = await req.json();
+      const existing = await db.prepare("SELECT order_number, status FROM orders WHERE id = ?").bind(id).first() as { order_number: string; status: string } | null;
       await db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id).run();
+      
+      if (existing) {
+        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
+          .bind(id, existing.order_number, session?.user?.email || "SYSTEM", `Status: ${existing.status} → ${status}`, JSON.stringify({ from: existing.status, to: status })).run();
+      }
+      
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
         const error = e as Error;
@@ -172,7 +187,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'update-notes') {
     try {
       const { order_number, notes } = await req.json();
+      const existing = await db.prepare("SELECT id, notes FROM orders WHERE order_number = ?").bind(order_number).first() as { id: string; notes: string } | null;
       await db.prepare("UPDATE orders SET notes = ? WHERE order_number = ?").bind(notes, order_number).run();
+      
+      if (existing) {
+        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'NOTES_UPDATE', 'Notes updated', ?)")
+          .bind(existing.id, order_number, session?.user?.email || "SYSTEM", JSON.stringify({ from: existing.notes, to: notes })).run();
+      }
+      
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
         const error = e as Error;
@@ -287,8 +309,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         .bind(order_number, customer_name, product_name, variant, image_url, quantity, id).run();
       
       // Log the update
-      await db.prepare("INSERT INTO audit_logs (order_id, user_email, action) VALUES (?, ?, ?)")
-        .bind(id, session?.user?.email || "SYSTEM", `Updated order details`).run();
+      await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_UPDATE', 'Updated order details', ?)")
+        .bind(id, order_number, session?.user?.email || "SYSTEM", JSON.stringify({ order_number, customer_name, product_name, variant, quantity })).run();
 
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
@@ -316,19 +338,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     const orderNumber = searchParams.get('order_number');
     try {
       if (id) {
+        const existing = await db.prepare("SELECT order_number FROM orders WHERE id = ?").bind(id).first() as { order_number: string } | null;
         await db.batch([
           db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id),
-          // We don't delete shipments here because it's a batch-level entity, 
-          // but we clear the order itself
           db.prepare("DELETE FROM orders WHERE id = ?").bind(id)
         ]);
+        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
+          .bind(id, existing?.order_number || id, session?.user?.email || "SYSTEM", JSON.stringify({ order_number: existing?.order_number })).run();
       } else if (orderNumber) {
-        // For batch delete, clear everything related to these orders
+        const ordersToDelete = await db.prepare("SELECT id, order_number FROM orders WHERE order_number = ?").bind(orderNumber).all();
         await db.batch([
           db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber),
           db.prepare("DELETE FROM shipments WHERE order_number = ?").bind(orderNumber),
           db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber)
         ]);
+        const userEmail = session?.user?.email || "SYSTEM";
+        for (const order of (ordersToDelete.results as { id: string; order_number: string }[])) {
+          await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
+            .bind(order.id, order.order_number, userEmail, JSON.stringify({ order_number: order.order_number })).run();
+        }
       }
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 

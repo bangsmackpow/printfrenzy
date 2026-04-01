@@ -27,10 +27,49 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   // 2. GET /api/admin/audit
   if (slug?.[0] === 'audit') {
     try {
-      const results = await db.prepare("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 100").all();
+      const { searchParams } = new URL(req.url);
+      const actionType = searchParams.get('action_type');
+      const userEmail = searchParams.get('user_email');
+      const limit = parseInt(searchParams.get('limit') || '200', 10);
+      
+      let query = `
+        SELECT al.*, o.customer_name, o.product_name, o.variant
+        FROM audit_logs al
+        LEFT JOIN orders o ON al.order_id = o.id
+      `;
+      const conditions: string[] = [];
+      const params: (string | number)[] = [];
+      
+      if (actionType) {
+        conditions.push('al.action_type = ?');
+        params.push(actionType);
+      }
+      if (userEmail) {
+        conditions.push('al.user_email = ?');
+        params.push(userEmail);
+      }
+      
+      if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+      }
+      
+      query += ' ORDER BY al.timestamp DESC LIMIT ?';
+      params.push(limit);
+      
+      const results = await db.prepare(query).bind(...params).all();
       return NextResponse.json(results.results);
     } catch (e: unknown) { 
       return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 
+    }
+  }
+  
+  // 3. GET /api/admin/audit/users
+  if (slug?.[0] === 'audit' && slug?.[1] === 'users') {
+    try {
+      const results = await db.prepare("SELECT DISTINCT user_email FROM audit_logs WHERE user_email != 'SYSTEM' ORDER BY user_email ASC").all();
+      return NextResponse.json(results.results);
+    } catch (e: unknown) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
     }
   }
 
@@ -69,8 +108,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       if (!adminUser || !(await verifyPassword(password, adminUser.password_hash))) {
         return NextResponse.json({ error: "Invalid admin password" }, { status: 401 });
       }
+      const orderCount = await db.prepare("SELECT COUNT(*) as count FROM orders").first() as { count: number };
       await db.prepare("DELETE FROM orders").run();
       await db.prepare("DELETE FROM shipments").run();
+      await db.prepare("INSERT INTO audit_logs (user_email, action_type, action, details) VALUES (?, 'SYSTEM_CLEAR', 'All orders cleared', ?)")
+        .bind(adminEmail, JSON.stringify({ orders_cleared: orderCount.count })).run();
       return NextResponse.json({ success: true });
     } catch (e: unknown) { 
         return NextResponse.json({ error: (e as Error).message }, { status: 500 }); 

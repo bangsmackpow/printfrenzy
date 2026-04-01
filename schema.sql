@@ -26,8 +26,11 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id TEXT,
+    order_number TEXT,
     user_email TEXT,
+    action_type TEXT,
     action TEXT,
+    details TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(order_id) REFERENCES orders(id)
 );
