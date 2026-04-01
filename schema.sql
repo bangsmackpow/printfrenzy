@@ -47,3 +47,25 @@ CREATE TABLE IF NOT EXISTS shipments (
     label_url TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS notification_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_email, stage)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email TEXT NOT NULL,
+    order_id TEXT,
+    order_number TEXT,
+    customer_name TEXT,
+    product_name TEXT,
+    from_stage TEXT,
+    to_stage TEXT NOT NULL,
+    moved_by TEXT NOT NULL,
+    read INTEGER DEFAULT 0,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);

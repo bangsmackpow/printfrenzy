@@ -148,13 +148,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     try {
       const { orderIds, status } = await req.json();
       const placeholders = orderIds.map(() => '?').join(',');
-      const existingOrders = await db.prepare(`SELECT id, order_number, status FROM orders WHERE id IN (${placeholders})`).bind(...orderIds).all();
+      const existingOrders = await db.prepare(`SELECT id, order_number, customer_name, product_name, status FROM orders WHERE id IN (${placeholders})`).bind(...orderIds).all();
       await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds).run();
       
       const userEmail = session?.user?.email || "SYSTEM";
-      for (const order of (existingOrders.results as { id: string; order_number: string; status: string }[])) {
+      const subscribers = await db.prepare("SELECT user_email FROM notification_subscriptions WHERE stage = ?").bind(status).all();
+      const subscribersList = (subscribers.results as { user_email: string }[]).map(s => s.user_email);
+      
+      for (const order of (existingOrders.results as { id: string; order_number: string; customer_name: string; product_name: string; status: string }[])) {
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
           .bind(order.id, order.order_number, userEmail, `Status: ${order.status} → ${status}`, JSON.stringify({ from: order.status, to: status })).run();
+        
+        for (const subEmail of subscribersList) {
+          if (subEmail !== userEmail) {
+            await db.prepare("INSERT INTO notifications (user_email, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+              .bind(subEmail, order.id, order.order_number, order.customer_name, order.product_name, order.status, status, userEmail).run();
+          }
+        }
       }
       
       return NextResponse.json({ success: true });
@@ -168,12 +178,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'status') {
     try {
       const { id, status } = await req.json();
-      const existing = await db.prepare("SELECT order_number, status FROM orders WHERE id = ?").bind(id).first() as { order_number: string; status: string } | null;
+      const existing = await db.prepare("SELECT order_number, status, customer_name, product_name FROM orders WHERE id = ?").bind(id).first() as { order_number: string; status: string; customer_name: string; product_name: string } | null;
       await db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id).run();
       
       if (existing) {
+        const userEmail = session?.user?.email || "SYSTEM";
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
-          .bind(id, existing.order_number, session?.user?.email || "SYSTEM", `Status: ${existing.status} → ${status}`, JSON.stringify({ from: existing.status, to: status })).run();
+          .bind(id, existing.order_number, userEmail, `Status: ${existing.status} → ${status}`, JSON.stringify({ from: existing.status, to: status })).run();
+        
+        const subscribers = await db.prepare("SELECT user_email FROM notification_subscriptions WHERE stage = ?").bind(status).all();
+        const subscribersList = (subscribers.results as { user_email: string }[]).map(s => s.user_email);
+        
+        for (const subEmail of subscribersList) {
+          if (subEmail !== userEmail) {
+            await db.prepare("INSERT INTO notifications (user_email, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+              .bind(subEmail, id, existing.order_number, existing.customer_name, existing.product_name, existing.status, status, userEmail).run();
+          }
+        }
       }
       
       return NextResponse.json({ success: true });

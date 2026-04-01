@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { useSession, signOut } from "next-auth/react";
 import Image from 'next/image';
+import { ToastNotifications, useNotifications } from '@/components/ToastNotifications';
 
 type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'STAGING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
@@ -22,6 +23,8 @@ interface Order {
   print_name?: string;
 }
 
+const STAGES: OrderStatus[] = ['RECEIVED', 'ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED', 'ARCHIVED'];
+
 function DashboardContent() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
@@ -30,6 +33,43 @@ function DashboardContent() {
   const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<OrderStatus | 'ALL'>('RECEIVED');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showSubscriptions, setShowSubscriptions] = useState(false);
+  const [subscriptions, setSubscriptions] = useState<string[]>([]);
+  const { notifications, dismissNotification, dismissAll, pollNotifications } = useNotifications();
+
+  const fetchSubscriptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications/subscribe');
+      if (res.ok) {
+        const data = await res.json();
+        setSubscriptions(data.map((s: { stage: string }) => s.stage));
+      }
+    } catch (err) {
+      console.error("Fetch subscriptions error:", err);
+    }
+  }, []);
+
+  const toggleSubscription = async (stage: OrderStatus) => {
+    const isSubscribed = subscriptions.includes(stage);
+    try {
+      const res = await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage, subscribe: !isSubscribed }),
+      });
+      if (res.ok) {
+        setSubscriptions(prev =>
+          isSubscribed ? prev.filter(s => s !== stage) : [...prev, stage]
+        );
+      }
+    } catch (err) {
+      console.error("Toggle subscription error:", err);
+    }
+  };
+
+  const handleNotificationClick = useCallback((notification: any) => {
+    setFilter(notification.to_stage);
+  }, []);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -69,8 +109,9 @@ function DashboardContent() {
       router.push('/login');
     } else if (authStatus === 'authenticated') {
       fetchItems();
+      fetchSubscriptions();
     }
-  }, [authStatus, router, fetchItems]);
+  }, [authStatus, router, fetchItems, fetchSubscriptions]);
 
   const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -162,6 +203,15 @@ function DashboardContent() {
         
         <div className="flex gap-4 items-center">
             <button 
+                onClick={() => setShowSubscriptions(!showSubscriptions)}
+                className="relative p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm group"
+            >
+                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                {subscriptions.length > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-600 rounded-full flex items-center justify-center text-[8px] font-black text-white">{subscriptions.length}</span>
+                )}
+            </button>
+            <button 
                 onClick={handleSync} 
                 disabled={syncing}
                 className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-900 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
@@ -196,6 +246,39 @@ function DashboardContent() {
             </button>
         </div>
       </header>
+
+      {/* Subscription Panel */}
+      {showSubscriptions && (
+        <div className="mb-10 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 uppercase italic">Notify Me When Orders Move To...</h3>
+              <p className="text-xs text-slate-400 font-medium mt-1">You'll get a popup when someone moves an order to a subscribed stage.</p>
+            </div>
+            <button onClick={() => setShowSubscriptions(false)} className="text-slate-400 hover:text-slate-600">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {STAGES.map(stage => {
+              const isSubscribed = subscriptions.includes(stage);
+              return (
+                <button
+                  key={stage}
+                  onClick={() => toggleSubscription(stage)}
+                  className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${
+                    isSubscribed
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100'
+                      : 'bg-white border-slate-200 text-slate-400 hover:border-blue-200 hover:text-blue-600'
+                  }`}
+                >
+                  {isSubscribed ? '🔔 ' : ''}{stage}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {selectedIds.length > 0 && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-8 py-5 rounded-[2.5rem] shadow-2xl flex items-center gap-8 border border-white/10 backdrop-blur-xl animate-in slide-in-from-bottom-10">
@@ -365,6 +448,8 @@ function DashboardContent() {
           })}
         </div>
       )}
+
+      <ToastNotifications onNotificationClick={handleNotificationClick} />
     </div>
   );
 }
