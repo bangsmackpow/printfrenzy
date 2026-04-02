@@ -135,3 +135,10 @@ The live production database has been verified and matches the current codebase 
 - **Multi-Image Wix/CSV Import**: Add `image_url2-4` support to Wix sync and CSV import (currently only manual orders).
 - **Webhook Retry Handling**: Add retry logic for failed webhook deliveries from Wix.
 - **Scheduled Sync Fallback**: Add cron-based sync as backup if webhooks fail.
+- **Cloudflare Rate Limiting**: Native rate limiting on login, upload, and shipping purchase endpoints.
+
+## 🧹 Cleanup Notes (April 1, 2026)
+- Removed temporary `image-diagnostic` admin endpoint (one-time use only).
+- Added `.wrangler/` to `.gitignore`.
+- All placeholder images now served from R2 (`pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg`) instead of local `/placeholder.png`.
+- Database backfilled: all orders with missing images now reference the R2 placeholder.

@@ -46,23 +46,28 @@ Protecting the production data and team access:
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
 - **Production Print Manifest**: A dedicated sidebar tab for generating global, high-resolution print manifests for all orders in the "PRINTING" stage.
 - **USPS Shipping Tool**: A standalone sidebar tool for generating and tracking USPS shipping labels for both internal orders and external shipments via Shippo API. Ensures sender contact compliance and hides postage price on labels.
-- **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing.
-- **R2 Integration**: Secure browser-to-bucket uploads for manual designs.
+- **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing. Cursor-based pagination (50/page, max 5 pages).
+- **Wix Webhook Integration**: Real-time order ingestion via `/api/webhooks/wix` with HMAC-SHA256 signature verification. No manual sync needed.
+- **R2 Integration**: Secure browser-to-bucket uploads for manual designs. Custom R2-hosted placeholder SVG for orders without artwork.
 - **Staff Control**: Admin panel for managing staff and resetting passwords.
-- **Order Sheets (v3)**: Per-batch selection interface — pick which batches to print. Each item prints on its own page as a compact packing slip with product image(s), variant, personalization, and QC sign-off checkboxes.
+- **Order sheets (v3)**: Per-batch selection interface — pick which batches to print. Each item prints on its own page as a compact packing slip with product image(s), variant, personalization, and QC sign-off checkboxes.
 - **Multi-Image Support**: Manual orders support up to 4 artwork images. Displayed as 2x2 quadrants in the queue and on packing slips. Click-to-enlarge lightbox with keyboard navigation.
 - **Universal Search**: Sidebar search bar (⌘K shortcut) searches across all order fields — order number, customer, product, variant, notes, print name, and status.
 - **Multi-Theme Experience**: Native support for Light, Dark, and High-Contrast Polarized modes. Theme preferences are persistent per user and sync across all logged-in devices.
 - **Staging Workflow**: Added a mandatory "STAGING" step between production and shipping to ensure physical inventory matches digital batches.
 - **Automated Security**: Gitleaks, Semgrep, and Trivy run on every push to detect secrets, logic flaws, and dependency vulnerabilities.
 - **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 600k iterations, constant-time API key comparison, CSV import limits, backup hardening.
+- **Copy Label URL**: One-click clipboard copy for shipping label URLs on both the Shipping Tool and Order Details pages.
+- **Shipping Audit Trail**: Every label purchase logged in audit log with tracking number, destination, and user email.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.
 - **Barcode Support**: Direct scanning of manifests to trigger movement through the production stages.
 - **Live Dispatch Dashboard**: Real-time status updates across different production workstations.
 - **Email Notifications**: Extend the notification system to send email alerts for critical stage transitions.
-- **Barcode Support**: Direct scanning of packing slips to trigger movement through the production stages.
+- **Multi-Image Wix/CSV Import**: Add `image_url2-4` support to Wix sync and CSV import (currently only manual orders).
+- **Webhook Retry Handling**: Add retry logic for failed webhook deliveries from Wix.
+- **Scheduled Sync Fallback**: Add cron-based sync as backup if webhooks fail.
 
 
 ---
@@ -79,3 +84,5 @@ Add these to your Cloudflare Pages Dashboard:
 - `SHIPPO_SENDER_ADDRESS_JSON`: JSON string of the default sender address (requires email & phone).
 - `WIX_API_KEY`: Wix API Key (Direct API sync).
 - `WIX_SITE_ID`: Wix Site ID (Direct API sync).
+- `WIX_WEBHOOK_SECRET`: HMAC secret for Wix webhook signature verification (real-time order ingestion).
+- `R2_PUBLIC_URL`: Public URL for R2 bucket (e.g., `https://pub-xxxx.r2.dev`).
