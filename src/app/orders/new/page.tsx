@@ -47,7 +47,7 @@ export default function NewOrderPage() {
 
     const dataToSubmit = {
         ...formData,
-        image_url: formData.image_url || '/placeholder.png'
+        image_url: formData.image_url || '/placeholder.svg'
     };
 
     try {

@@ -237,7 +237,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     const WIX_SITE_ID = process.env.WIX_SITE_ID;
 
     if (!WIX_API_KEY || !WIX_SITE_ID) {
-      return NextResponse.json({ error: "Configuration error" }, { status: 500 });
+      const missing = [];
+      if (!WIX_API_KEY) missing.push("WIX_API_KEY");
+      if (!WIX_SITE_ID) missing.push("WIX_SITE_ID");
+      return NextResponse.json({ error: `Missing env vars: ${missing.join(", ")}. Set them in Cloudflare Pages dashboard.` }, { status: 500 });
     }
 
     try {

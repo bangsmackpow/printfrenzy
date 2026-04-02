@@ -1,5 +1,5 @@
 export function getPrinterQualityImage(url: string, highRes = false): string {
-  if (!url) return "/placeholder.png";
+  if (!url) return "/placeholder.svg";
 
   let finalUrl = url;
 

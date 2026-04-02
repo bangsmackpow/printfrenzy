@@ -91,7 +91,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
       const dataToSubmit = {
         id,
         ...formData,
-        image_url: formData.image_url || '/placeholder.png'
+        image_url: formData.image_url || '/placeholder.svg'
       };
 
       const res = await fetch('/api/orders/update', {
