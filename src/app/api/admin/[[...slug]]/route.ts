@@ -99,6 +99,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     } catch (e: unknown) { return sanitizeError(e); }
   }
 
+  if (slug?.[0] === 'backfill-images') {
+    try {
+      const before = await db.prepare("SELECT COUNT(*) as count FROM orders WHERE image_url IS NULL OR image_url = ''").first() as { count: number };
+      await db.prepare("UPDATE orders SET image_url = '/placeholder.svg' WHERE image_url IS NULL OR image_url = ''").run();
+      return NextResponse.json({ success: true, updated: before.count });
+    } catch (e: unknown) { return sanitizeError(e); }
+  }
+
   if (slug?.[0] === 'clear') {
     try {
       const { password } = await req.json();
