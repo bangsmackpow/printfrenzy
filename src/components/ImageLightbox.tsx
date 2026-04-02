@@ -21,7 +21,7 @@ export function ImageLightbox({ images, onClose }: ImageLightboxProps) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose, images.length]);
 
-  const validImages = images.filter(img => img && img !== '/placeholder.svg');
+  const validImages = images.filter(img => img && !img.includes('r2.dev/placeholder.svg'));
   if (validImages.length === 0) return null;
 
   return (

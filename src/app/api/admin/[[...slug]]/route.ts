@@ -102,7 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'backfill-images') {
     try {
       const before = await db.prepare("SELECT COUNT(*) as count FROM orders WHERE image_url IS NULL OR image_url = ''").first() as { count: number };
-      await db.prepare("UPDATE orders SET image_url = '/placeholder.svg' WHERE image_url IS NULL OR image_url = ''").run();
+      await db.prepare("UPDATE orders SET image_url = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg' WHERE image_url IS NULL OR image_url = ''").run();
       return NextResponse.json({ success: true, updated: before.count });
     } catch (e: unknown) { return sanitizeError(e); }
   }

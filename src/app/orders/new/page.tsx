@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
+const PLACEHOLDER_URL = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg';
+
 export default function NewOrderPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -47,7 +49,7 @@ export default function NewOrderPage() {
 
     const dataToSubmit = {
         ...formData,
-        image_url: formData.image_url || '/placeholder.svg'
+        image_url: formData.image_url || PLACEHOLDER_URL
     };
 
     try {
