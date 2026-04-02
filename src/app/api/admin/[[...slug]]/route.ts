@@ -107,6 +107,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     } catch (e: unknown) { return sanitizeError(e); }
   }
 
+  if (slug?.[0] === 'image-diagnostic') {
+    try {
+      const results = await db.prepare("SELECT DISTINCT image_url, COUNT(*) as count FROM orders GROUP BY image_url ORDER BY count DESC LIMIT 20").all();
+      return NextResponse.json(results.results);
+    } catch (e: unknown) { return sanitizeError(e); }
+  }
+
   if (slug?.[0] === 'clear') {
     try {
       const { password } = await req.json();
