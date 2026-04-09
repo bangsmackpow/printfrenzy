@@ -367,7 +367,7 @@ function DetailContent() {
                 </button>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Order Management System</p>
             </div>
-            <h1 className="text-6xl font-black text-slate-900 tracking-tighter italic uppercase">Batch: {orderNumber}</h1>
+            <h1 className="text-6xl font-black text-blue-600 tracking-tighter italic uppercase">Batch: {orderNumber}</h1>
           </div>
 
           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50 flex-grow max-w-md w-full">

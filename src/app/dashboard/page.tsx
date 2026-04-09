@@ -342,7 +342,7 @@ function DashboardContent() {
                   
                   <div className="flex flex-col">
                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">Batch Identifier</p>
-                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase flex items-center gap-4">
+                    <h2 className="text-4xl font-black text-blue-600 tracking-tighter italic uppercase flex items-center gap-4">
                         Batch: {orderNum}
                         <span className="text-slate-200 font-normal">/</span>
                         <span className="text-blue-600 text-2xl">#{items.length} Items</span>
