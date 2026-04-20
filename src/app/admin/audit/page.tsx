@@ -29,6 +29,7 @@ export default function AuditAdmin() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<string[]>([]);
+  const [stats, setStats] = useState<{ date: string; count: number }[]>([]);
   const [filterActionType, setFilterActionType] = useState('');
   const [filterUser, setFilterUser] = useState('');
 
@@ -38,6 +39,7 @@ export default function AuditAdmin() {
       const params = new URLSearchParams();
       if (filterActionType) params.set('action_type', filterActionType);
       if (filterUser) params.set('user_email', filterUser);
+      params.set('limit', '100');
       const res = await fetch(`/api/admin/audit?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
@@ -62,9 +64,21 @@ export default function AuditAdmin() {
     }
   };
 
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/admin/stats');
+      if (res.ok) {
+        setStats(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
     fetchUsers();
+    fetchStats();
   }, []);
 
   useEffect(() => {
@@ -83,17 +97,78 @@ export default function AuditAdmin() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-10 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight italic">Audit Log</h1>
-            <p className="text-slate-500 mt-2 font-medium">Complete history of all system actions and status changes.</p>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight italic uppercase">Command Center</h1>
+            <p className="text-slate-500 mt-2 font-medium">Just-in-time reporting and system accountability.</p>
           </div>
-          <button onClick={fetchLogs} className="p-3 text-slate-400 hover:text-blue-600 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-100 transition-all">
-            <svg className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+          <div className="flex gap-3">
+              <button onClick={() => { fetchLogs(); fetchStats(); }} className="p-3 text-slate-400 hover:text-blue-600 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-100 transition-all">
+                <svg className={`h-6 w-6 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+          </div>
         </div>
 
-        {/* Filters */}
+        {/* Just In Time Reports Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            {/* Quick Filters */}
+            <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8">
+                <h2 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-6">Quick Intelligence Reports</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <button 
+                        onClick={() => { setFilterActionType('ORDER_DELETE'); setFilterUser(''); }}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all ${filterActionType === 'ORDER_DELETE' ? 'border-blue-600 bg-blue-50' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
+                    >
+                        <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Investigation</p>
+                        <p className="font-black text-slate-900 text-xs">Recent Deletions</p>
+                    </button>
+                    <button 
+                        onClick={() => { setFilterActionType('SHIPMENT_CREATED'); setFilterUser(''); }}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all ${filterActionType === 'SHIPMENT_CREATED' ? 'border-blue-600 bg-blue-50' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
+                    >
+                        <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Logistics</p>
+                        <p className="font-black text-slate-900 text-xs">Label Purchases</p>
+                    </button>
+                    <button 
+                        onClick={() => { setFilterActionType('SYSTEM_CLEAR'); setFilterUser(''); }}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all ${filterActionType === 'SYSTEM_CLEAR' ? 'border-blue-600 bg-blue-50' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
+                    >
+                        <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Destructive</p>
+                        <p className="font-black text-slate-900 text-xs">System Clears</p>
+                    </button>
+                    <button 
+                        onClick={clearFilters}
+                        className="p-4 rounded-2xl border-2 border-slate-900 bg-slate-900 text-left hover:bg-blue-600 hover:border-blue-600 transition-all group"
+                    >
+                        <p className="text-[9px] font-black uppercase text-slate-400 group-hover:text-blue-100 mb-1">All Data</p>
+                        <p className="font-black text-white text-xs">Full System History</p>
+                    </button>
+                </div>
+            </div>
+
+            {/* Production Stats */}
+            <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8">
+                <h2 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mb-6">Production Velocity</h2>
+                <div className="space-y-4">
+                    {stats.slice(0, 4).map((stat, i) => (
+                        <div key={stat.date} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-1.5 h-8 rounded-full ${i === 0 ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-900 uppercase italic">
+                                        {new Date(stat.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                    </p>
+                                </div>
+                            </div>
+                            <p className="text-xl font-black text-slate-900 tracking-tighter italic">x{stat.count}</p>
+                        </div>
+                    ))}
+                    {stats.length === 0 && <p className="text-slate-300 font-bold italic text-sm py-4">Waiting for production data...</p>}
+                </div>
+            </div>
+        </div>
+
+        {/* Existing Filters & Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[200px]">

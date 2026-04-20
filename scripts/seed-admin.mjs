@@ -1,11 +1,26 @@
-import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+
+/**
+ * PBKDF2 Hashing (Node.js compatible version for scripts)
+ * MATCHES src/utils/hashUtils.ts (600,000 iterations)
+ */
+function hashPassword(password) {
+  const iterations = 600000;
+  const salt = crypto.randomBytes(16);
+  const keyLen = 32; 
+  
+  const hash = crypto.pbkdf2Sync(password, salt, iterations, keyLen, 'sha256');
+  const saltHex = salt.toString('hex');
+  const hashHex = hash.toString('hex');
+  
+  return `${iterations}.${saltHex}.${hashHex}`;
+}
 
 async function generateAdmin() {
     const email = process.argv[2] || 'admin@printfrenzy.dev';
     const password = process.argv[3] || 'changeme123';
     const id = crypto.randomUUID();
-    const hash = await bcrypt.hash(password, 10);
+    const hash = hashPassword(password);
 
     console.log('\n--- FIRST ADMIN SETUP ---');
     console.log(`Email: ${email}`);

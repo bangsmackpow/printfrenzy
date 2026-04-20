@@ -446,9 +446,8 @@ function DetailContent() {
                       {/* Print Name Input */}
                       <div className="mt-6">
                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Personalization / Prints Name</label>
-                          <input 
-                            type="text" 
-                            defaultValue={row.print_name || ""} 
+                          <textarea
+                            defaultValue={row.print_name || ""}
                             onBlur={async (e) => {
                                 if (e.target.value !== row.print_name) {
                                     await fetch(`/api/orders/update-item`, {
@@ -459,10 +458,10 @@ function DetailContent() {
                                 }
                             }}
                             placeholder="Type name here..."
+                            rows={3}
                             className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all uppercase italic"
                           />
-                      </div>
-                    </div>
+                      </div>                    </div>
 
                     <div className="mt-8 pt-8 border-t border-slate-100 flex gap-2">
                       <button

@@ -2,9 +2,10 @@ const crypto = require('crypto');
 
 /**
  * PBKDF2 Hashing (Node.js compatible version for scripts)
+ * MATCHES src/utils/hashUtils.ts (600,000 iterations)
  */
 function hashPassword(password) {
-  const iterations = 100000;
+  const iterations = 600000;
   const salt = crypto.randomBytes(16);
   const keyLen = 32; 
   

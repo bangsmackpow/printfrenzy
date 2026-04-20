@@ -17,7 +17,9 @@ export default function NewOrderPage() {
     image_url2: '',
     image_url3: '',
     image_url4: '',
-    quantity: 1
+    quantity: 1,
+    print_name: '',
+    notes: ''
   });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState<Record<number, boolean>>({});
@@ -146,6 +148,28 @@ export default function NewOrderPage() {
               onChange={(e) => setFormData({ ...formData, variant: e.target.value })}
               className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase"
               placeholder="e.g. ADULT XL"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Personalization / Prints Name</label>
+            <textarea
+              value={formData.print_name}
+              onChange={(e) => setFormData({ ...formData, print_name: e.target.value })}
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase italic"
+              placeholder="ENTER NAMES HERE..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Notes</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={2}
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              placeholder="Internal notes..."
             />
           </div>
 

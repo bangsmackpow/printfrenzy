@@ -72,6 +72,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     } catch (e: unknown) { return sanitizeError(e); }
   }
 
+  if (slug?.[0] === 'stats') {
+    try {
+      const results = await db.prepare(`
+        SELECT DATE(created_at) as date, COUNT(*) as count 
+        FROM orders 
+        WHERE created_at > DATE('now', '-7 days') 
+        GROUP BY date 
+        ORDER BY date DESC
+      `).all();
+      return NextResponse.json(results.results);
+    } catch (e: unknown) { return sanitizeError(e); }
+  }
+
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
 }
 

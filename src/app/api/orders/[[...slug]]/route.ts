@@ -318,27 +318,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (slug?.[0] === 'manual') {
     try {
-      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity } = await req.json();
+      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = await req.json();
       if (image_url && !isValidHttpsUrl(image_url)) return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
       const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
-      await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
-        .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty).run();
+      await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, status, print_name, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?)")
+        .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null).run();
       return NextResponse.json({ success: true });
     } catch (e: unknown) { return sanitizeError(e); }
   }
 
   if (slug?.[0] === 'update') {
     try {
-      const { id, order_number, customer_name, product_name, variant, image_url, quantity } = await req.json();
+      const { id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = await req.json();
       if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
       if (image_url && !isValidHttpsUrl(image_url)) return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
       const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
 
-      await db.prepare("UPDATE orders SET order_number = ?, customer_name = ?, product_name = ?, variant = ?, image_url = ?, quantity = ? WHERE id = ?")
-        .bind(order_number, customer_name, product_name, variant, image_url, qty, id).run();
+      await db.prepare("UPDATE orders SET order_number = ?, customer_name = ?, product_name = ?, variant = ?, image_url = ?, image_url2 = ?, image_url3 = ?, image_url4 = ?, quantity = ?, print_name = ?, notes = ? WHERE id = ?")
+        .bind(order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null, id).run();
       
       await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_UPDATE', 'Updated order details', ?)")
-        .bind(id, order_number, session?.user?.email || "SYSTEM", JSON.stringify({ order_number, customer_name, product_name, variant, quantity: qty })).run();
+        .bind(id, order_number, session?.user?.email || "SYSTEM", JSON.stringify({ order_number, customer_name, product_name, variant, quantity: qty, print_name, notes })).run();
 
       return NextResponse.json({ success: true });
     } catch (e: unknown) { return sanitizeError(e); }
