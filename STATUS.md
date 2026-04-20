@@ -1,5 +1,29 @@
 # Project Status - PrintFrenzy
 
+## 🚀 Recent Major Updates (April 20, 2026 — Session 3)
+
+### 11. 🛡️ Security Synchronization (Live)
+- **Unified Hashing Standards**: Synchronized PBKDF2 iterations to **600,000** across the production app and all helper scripts (`create-admin.js`, `seed-admin.mjs`).
+- **Standardized Format**: Ensured scripts generate the exact `iterations.salt.hash` format required by the production `hashUtils.ts`.
+- **Bcrypt Removal**: Fully removed legacy bcrypt references from seeding scripts to prevent login failures.
+
+### 12. 📊 Admin Command Center (Live)
+- **Just-In-Time Reporting**: The Audit page has been transformed into a Command Center with quick-action intelligence reports.
+- **One-Click Investigation**: Dedicated buttons to instantly filter for `Order Deletions`, `Label Purchases`, and `System Clears`.
+- **Production Velocity Widget**: Real-time stats dashboard showing order volume for the last 7 days to monitor system health and ingestion consistency.
+- **Stats API**: New secure endpoint `/api/admin/stats` providing aggregated daily totals.
+
+### 13. ✍️ Multi-Line Personalization & Enhanced Editing (Live)
+- **Textarea Upgrade**: "Personalization / Prints Name" is now a multi-line textarea across the New Order, Edit Order, and Order Details pages, supporting complex lists of names.
+- **Full Edit Support**: The Edit Order page now supports all 4 artwork image slots, production notes, and personalization (previously limited to 1 image).
+- **Manual Order Parity**: Manual orders now support production notes and personalization fields at creation time.
+
+### 14. 🔍 Investigation: Order Integrity
+- **Audit Verification**: Investigated reports of missing orders. Confirmed via D1 audit log analysis that no mass-deletions or system clears occurred in the last week.
+- **Upload Reliability**: Verified R2 upload functionality with live testing and log tailing. Confirmed that magic-byte validation and 10MB limits are enforced and working.
+
+---
+
 ## 🚀 Recent Major Updates (April 1, 2026 — Session 2)
 
 ### 7. 📋 Copy Label URL to Clipboard (Live)
