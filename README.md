@@ -63,6 +63,8 @@ Protecting the production data and team access:
 - **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 600k iterations, constant-time API key comparison, CSV import limits, backup hardening.
 - **Copy Label URL**: One-click clipboard copy for shipping label URLs on both the Shipping Tool and Order Details pages.
 - **Shipping Audit Trail**: Every label purchase logged in audit log with tracking number, destination, and user email.
+- **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (including PDF) and magic-byte validation.
+- **Axiom Logging**: High-signal event streaming for uploads, shipping, and order imports to Axiom for "after the fact" debugging.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.
@@ -72,7 +74,6 @@ Protecting the production data and team access:
 - **Multi-Image Wix/CSV Import**: Add `image_url2-4` support to Wix sync and CSV import (currently only manual orders).
 - **Webhook Retry Handling**: Add retry logic for failed webhook deliveries from Wix.
 - **Scheduled Sync Fallback**: Add cron-based sync as backup if webhooks fail.
-
 
 ---
 
@@ -90,3 +91,6 @@ Add these to your Cloudflare Pages Dashboard:
 - `WIX_SITE_ID`: Wix Site ID (Direct API sync).
 - `WIX_WEBHOOK_SECRET`: HMAC secret for Wix webhook signature verification (real-time order ingestion).
 - `R2_PUBLIC_URL`: Public URL for R2 bucket (e.g., `https://pub-xxxx.r2.dev`).
+- `AXIOM_DATASET`: Axiom dataset name for high-signal logging.
+- `AXIOM_TOKEN`: Axiom API token for event streaming.
+

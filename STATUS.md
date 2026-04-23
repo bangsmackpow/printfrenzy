@@ -1,5 +1,20 @@
 # Project Status - PrintFrenzy
 
+## 🚀 Recent Major Updates (April 23, 2026 — Session 4)
+
+### 15. 📈 High-Signal Observability (Axiom Integration)
+- **Axiom Streaming**: Integrated Axiom logging across all critical production endpoints (Uploads, Shipping, Order Imports, Wix Sync).
+- **Silent Failure Visibility**: Replaced standard `console.error` with `log.error` to Axiom, providing "after the fact" debugging for edge runtime execution failures.
+- **Rich Event Context**: Every log entry captures user email, filename, file size, and third-party API responses (Shippo/Wix).
+- **Edge-Compatible Logger**: Built a lightweight `src/utils/logger.ts` that uses standard `fetch` to keep cold starts fast and memory usage low.
+
+### 16. 📦 Enhanced Upload & PDF Support
+- **Increased Capacity**: Boosted `MAX_FILE_SIZE` from 10MB to **20MB** in response to high-resolution artwork needs.
+- **Universal PDF Support**: Enabled `.pdf` file uploads in both the New Order and Edit Order UI.
+- **Backend Validation**: Updated magic-byte validation and MIME whitelist to robustly support PDF while maintaining security.
+
+---
+
 ## 🚀 Recent Major Updates (April 20, 2026 — Session 3)
 
 ### 11. 🛡️ Security Synchronization (Live)
