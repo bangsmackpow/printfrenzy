@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { log } from "@/utils/logger";
 
 export const runtime = 'edge';
 
@@ -51,9 +52,10 @@ function parseCSV(text: string) {
   });
 }
 
-function sanitizeError(e: unknown): never {
-  if (e instanceof Error) console.error("API error:", e.message);
-  return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
+async function sanitizeError(e: unknown, context: Record<string, any> = {}): Promise<NextResponse> {
+  const message = e instanceof Error ? e.message : "Unknown error";
+  await log.error("Orders API failure", { error: message, ...context });
+  return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
 
 function isValidHttpsUrl(str: string): boolean {
@@ -83,7 +85,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
         const results = await db.prepare("SELECT * FROM orders WHERE status = 'PRINTING' ORDER BY order_number DESC, customer_name ASC").all();
         return NextResponse.json(results.results);
       }
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { slug, orderNumber }); }
   }
 
   if (slug?.[0] === 'single') {
@@ -92,13 +94,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
       const result = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first();
       return NextResponse.json(result);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { slug, id }); }
   }
 
   try {
     const results = await db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
     return NextResponse.json(results.results);
-  } catch (e: unknown) { return sanitizeError(e); }
+  } catch (e: unknown) { return sanitizeError(e, { slug }); }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
@@ -106,6 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
+  const userEmail = session?.user?.email || "unknown";
   const apiKey = req.headers.get("x-api-key");
   const validApiKey = process.env.API_IMPORT_KEY;
   
@@ -123,14 +126,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         const formData = await req.formData();
         const file = formData.get('file') as File;
         const batchName = formData.get('batch_name') as string || "";
-        if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
-        if (file.size > MAX_CSV_SIZE) return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
+        
+        if (!file) {
+          await log.warn("CSV Import failed: No file", { user: userEmail });
+          return NextResponse.json({ error: "No file" }, { status: 400 });
+        }
+
+        await log.info("CSV Import started", { user: userEmail, filename: file.name, size: file.size, batchName });
+
+        if (file.size > MAX_CSV_SIZE) {
+          await log.warn("CSV Import rejected: File too large", { user: userEmail, size: file.size });
+          return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
+        }
 
         const text = await file.text();
         const records = parseCSV(text);
-        if (records.length > MAX_CSV_RECORDS) return NextResponse.json({ error: `Too many records (max ${MAX_CSV_RECORDS})` }, { status: 400 });
-        let count = 0;
+        
+        if (records.length > MAX_CSV_RECORDS) {
+          await log.warn("CSV Import rejected: Too many records", { user: userEmail, count: records.length });
+          return NextResponse.json({ error: `Too many records (max ${MAX_CSV_RECORDS})` }, { status: 400 });
+        }
 
+        let count = 0;
         for (const record of records) {
             const wixOrderNum = record['Order number'] || record['Order ID'] || record['order_number'];
             const customerName = record['Customer name'] || record['Billing Name'] || record['customer_name'] || 'Unknown';
@@ -146,14 +163,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
                 count++;
             }
         }
+        
+        await log.info("CSV Import successful", { user: userEmail, imported: count, total: records.length });
         return NextResponse.json({ count });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
+
 
   if (slug?.[0] === 'bulk-status') {
     try {
       const { orderIds, status } = await req.json();
       if (!Array.isArray(orderIds) || orderIds.length === 0) return NextResponse.json({ error: "Invalid orderIds" }, { status: 400 });
+      
+      await log.info("Bulk status update started", { user: userEmail, count: orderIds.length, targetStatus: status });
+
       if (orderIds.length > MAX_BULK_IDS) return NextResponse.json({ error: `Too many items (max ${MAX_BULK_IDS})` }, { status: 400 });
       if (!ALLOWED_STATUSES.includes(status as typeof ALLOWED_STATUSES[number])) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
 
@@ -161,7 +184,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const existingOrders = await db.prepare(`SELECT id, order_number, customer_name, product_name, status FROM orders WHERE id IN (${placeholders})`).bind(...orderIds).all();
       await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds).run();
       
-      const userEmail = session?.user?.email || "SYSTEM";
       const subscribers = await db.prepare("SELECT user_email FROM notification_subscriptions WHERE stage = ?").bind(status).all();
       const subscribersList = (subscribers.results as { user_email: string }[]).map(s => s.user_email);
       
@@ -177,8 +199,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         }
       }
       
+      await log.info("Bulk status update successful", { user: userEmail, count: orderIds.length });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
   if (slug?.[0] === 'status') {
@@ -190,7 +213,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id).run();
       
       if (existing) {
-        const userEmail = session?.user?.email || "SYSTEM";
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
           .bind(id, existing.order_number, userEmail, `Status: ${existing.status} → ${status}`, JSON.stringify({ from: existing.status, to: status })).run();
         
@@ -206,7 +228,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       }
       
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
   if (slug?.[0] === 'update-notes') {
@@ -217,11 +239,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       
       if (existing) {
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'NOTES_UPDATE', 'Notes updated', ?)")
-          .bind(existing.id, order_number, session?.user?.email || "SYSTEM", JSON.stringify({ from: existing.notes, to: notes })).run();
+          .bind(existing.id, order_number, userEmail, JSON.stringify({ from: existing.notes, to: notes })).run();
       }
       
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
   if (slug?.[0] === 'update-item') {
@@ -229,7 +251,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { id, print_name } = await req.json();
       await db.prepare("UPDATE orders SET print_name = ? WHERE id = ?").bind(print_name, id).run();
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
   if (slug?.[0] === 'sync') {
@@ -237,13 +259,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     const WIX_SITE_ID = process.env.WIX_SITE_ID;
 
     if (!WIX_API_KEY || !WIX_SITE_ID) {
-      const missing = [];
-      if (!WIX_API_KEY) missing.push("WIX_API_KEY");
-      if (!WIX_SITE_ID) missing.push("WIX_SITE_ID");
-      return NextResponse.json({ error: `Missing env vars: ${missing.join(", ")}. Set them in Cloudflare Pages dashboard.` }, { status: 500 });
+      await log.error("Wix Sync failed: Missing credentials", { user: userEmail });
+      return NextResponse.json({ error: "Missing Wix environment variables" }, { status: 500 });
     }
 
     try {
+        await log.info("Wix API Sync started", { user: userEmail });
         let addedCount = 0;
         let skippedCount = 0;
         let cursor: string | null = null;
@@ -271,7 +292,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
             });
 
             if (!wRes.ok) {
-                console.error("Wix API error:", wRes.status, await wRes.text());
+                const errText = await wRes.text();
+                await log.error("Wix API returned error", { status: wRes.status, body: errText, user: userEmail });
                 return NextResponse.json({ error: "Failed to sync with Wix" }, { status: wRes.status });
             }
 
@@ -308,41 +330,53 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
             pageCount++;
             const pagingMetadata = data.pagingMetadata;
             cursor = pagingMetadata?.next || null;
-
             if (!cursor) break;
         }
 
+        await log.info("Wix API Sync successful", { user: userEmail, added: addedCount, skipped: skippedCount, pages: pageCount });
         return NextResponse.json({ success: true, added: addedCount, skipped: skippedCount, pages: pageCount });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
   if (slug?.[0] === 'manual') {
     try {
-      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = await req.json();
-      if (image_url && !isValidHttpsUrl(image_url)) return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
+      const body = await req.json();
+      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = body;
+      
+      await log.info("Manual order injection started", { user: userEmail, order_number, customer_name });
+
+      if (image_url && !isValidHttpsUrl(image_url)) {
+        await log.warn("Manual injection rejected: Invalid image URL", { user: userEmail, order_number, image_url });
+        return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
+      }
+
       const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
       await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, status, print_name, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?)")
         .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null).run();
+      
+      await log.info("Manual order injection successful", { user: userEmail, order_number });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
   if (slug?.[0] === 'update') {
     try {
-      const { id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = await req.json();
+      const body = await req.json();
+      const { id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = body;
+      
       if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
-      if (image_url && !isValidHttpsUrl(image_url)) return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
-      const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+      
+      await log.info("Order update started", { user: userEmail, id, order_number });
 
+      const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
       await db.prepare("UPDATE orders SET order_number = ?, customer_name = ?, product_name = ?, variant = ?, image_url = ?, image_url2 = ?, image_url3 = ?, image_url4 = ?, quantity = ?, print_name = ?, notes = ? WHERE id = ?")
         .bind(order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null, id).run();
       
-      await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_UPDATE', 'Updated order details', ?)")
-        .bind(id, order_number, session?.user?.email || "SYSTEM", JSON.stringify({ order_number, customer_name, product_name, variant, quantity: qty, print_name, notes })).run();
-
+      await log.info("Order update successful", { user: userEmail, id, order_number });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
+
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
 }

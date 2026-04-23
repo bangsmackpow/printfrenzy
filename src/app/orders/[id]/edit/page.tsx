@@ -253,7 +253,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
                         type="file"
                         onChange={(e) => handleFileUpload(idx + 1, e)}
                         className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                        accept="image/*"
+                        accept="image/*,application/pdf"
                       />
                       {url ? (
                         <>
