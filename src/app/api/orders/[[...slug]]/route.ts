@@ -248,8 +248,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (slug?.[0] === 'update-item') {
     try {
-      const { id, print_name } = await req.json();
-      await db.prepare("UPDATE orders SET print_name = ? WHERE id = ?").bind(print_name, id).run();
+      const { id, print_name, notes } = await req.json();
+      if (print_name !== undefined && notes !== undefined) {
+        await db.prepare("UPDATE orders SET print_name = ?, notes = ? WHERE id = ?").bind(print_name, notes, id).run();
+      } else if (print_name !== undefined) {
+        await db.prepare("UPDATE orders SET print_name = ? WHERE id = ?").bind(print_name, id).run();
+      } else if (notes !== undefined) {
+        await db.prepare("UPDATE orders SET notes = ? WHERE id = ?").bind(notes, id).run();
+      }
       return NextResponse.json({ success: true });
     } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }

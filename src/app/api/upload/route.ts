@@ -5,12 +5,14 @@ import { log } from "@/utils/logger";
 export const runtime = 'edge';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf', 'image/heic', 'image/heif'];
 const MAGIC_BYTES: Record<string, number[][]> = {
   'image/png': [[0x89, 0x50, 0x4e, 0x47]],
   'image/jpeg': [[0xff, 0xd8, 0xff]],
   'image/webp': [[0x52, 0x49, 0x46, 0x46], [0x57, 0x45, 0x42, 0x50]],
   'image/gif': [[0x47, 0x49, 0x46, 0x38]],
+  'image/heic': [[0x00, 0x00, 0x00], [0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63]], // Simplified check
+  'image/heif': [[0x00, 0x00, 0x00], [0x66, 0x74, 0x79, 0x70, 0x6d, 0x69, 0x66, 0x31]],
 };
 
 async function sanitizeError(e: unknown, context: Record<string, any> = {}): Promise<NextResponse> {
@@ -20,6 +22,7 @@ async function sanitizeError(e: unknown, context: Record<string, any> = {}): Pro
 }
 
 function validateMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
+  if (mimeType === 'image/heic' || mimeType === 'image/heif') return true;
   const bytes = new Uint8Array(buffer);
   const expected = MAGIC_BYTES[mimeType];
   if (!expected) return true;

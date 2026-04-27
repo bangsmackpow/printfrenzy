@@ -371,17 +371,17 @@ function DetailContent() {
           </div>
 
           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50 flex-grow max-w-md w-full">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block">Internal Batch Notes</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block">Global Batch Note (Overwrites All Items)</label>
               <textarea 
                 value={batchNote} 
                 onChange={(e) => setBatchNote(e.target.value)}
                 onBlur={saveBatchNote}
-                placeholder="Mention special requests, rushes, or issues here..."
+                placeholder="Special requests that apply to EVERYTHING in this batch..."
                 className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all h-24 resize-none"
               />
               <div className="flex items-center justify-between mt-1">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase italic">Notes share across all production queues</p>
-                  <button onClick={saveBatchNote} className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all">Save Notes</button>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase italic">Careful: Saving this replaces all individual part notes</p>
+                  <button onClick={saveBatchNote} className="px-3 py-1 bg-red-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all">Save Global</button>
               </div>
           </div>
         </header>
@@ -458,8 +458,25 @@ function DetailContent() {
                                 }
                             }}
                             placeholder="Type name here..."
-                            rows={3}
-                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all uppercase italic"
+                            rows={2}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none transition-all uppercase italic mb-4"
+                          />
+
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Production Notes</label>
+                          <textarea
+                            defaultValue={row.notes || ""}
+                            onBlur={async (e) => {
+                                if (e.target.value !== row.notes) {
+                                    await fetch(`/api/orders/update-item`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: row.id, notes: e.target.value })
+                                    });
+                                }
+                            }}
+                            placeholder="Internal notes for this part..."
+                            rows={2}
+                            className="w-full bg-amber-50/30 border border-amber-100/50 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                           />
                       </div>                    </div>
 

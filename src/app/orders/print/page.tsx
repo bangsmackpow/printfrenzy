@@ -224,14 +224,6 @@ function PrintContent() {
                 </div>
               )}
 
-              {/* Batch note on first item if exists */}
-              {idx === 0 && item.notes && (
-                <div className="bg-amber-50 p-6 rounded-2xl border-4 border-amber-400 border-dashed mb-8">
-                  <p className="text-xs font-black uppercase text-amber-600 tracking-widest mb-1">Production Note</p>
-                  <p className="text-lg font-black italic text-slate-900">&quot;{item.notes}&quot;</p>
-                </div>
-              )}
-
               {/* Single item packing slip */}
               <div className="border-4 border-black rounded-3xl overflow-hidden bg-white relative">
                 {/* QTY Badge */}
@@ -295,6 +287,13 @@ function PrintContent() {
                         <div className="bg-blue-600 p-5 rounded-xl text-white">
                           <p className="text-[9px] font-black uppercase text-blue-200 tracking-widest mb-1">Name to Print</p>
                           <p className="text-4xl font-black tracking-tighter uppercase italic">{item.print_name}</p>
+                        </div>
+                      )}
+
+                      {item.notes && (
+                        <div className="bg-amber-50 p-4 rounded-xl border-2 border-amber-400 border-dashed">
+                          <p className="text-[9px] font-black uppercase text-amber-600 tracking-widest mb-1">Production Notes</p>
+                          <p className="text-sm font-black italic text-slate-700 leading-tight">"{item.notes}"</p>
                         </div>
                       )}
                     </div>
