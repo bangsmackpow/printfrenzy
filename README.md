@@ -63,6 +63,10 @@ Protecting the production data and team access:
 - **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 600k iterations, constant-time API key comparison, CSV import limits, backup hardening.
 - **Copy Label URL**: One-click clipboard copy for shipping label URLs on both the Shipping Tool and Order Details pages.
 - **Shipping Audit Trail**: Every label purchase logged in audit log with tracking number, destination, and user email.
+- **RGC Vinyl Pricing Engine**: Pro-grade square-inch based calculator with mode-based presets (Simple, Layered, Printed), setup fees, and shop minimums.
+- **Apple HEIC Support**: Support for `.heic` and `.heif` image uploads from mobile devices.
+- **Trace ID & Diagnostic UI**: Unique support codes for all errors with one-click diagnostic data export for staff.
+- **Shipping Resiliency**: Duplicate charge prevention and post-purchase database auto-recovery.
 - **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (including PDF) and magic-byte validation.
 - **Axiom Logging**: High-signal event streaming for uploads, shipping, and order imports to Axiom for "after the fact" debugging.
 

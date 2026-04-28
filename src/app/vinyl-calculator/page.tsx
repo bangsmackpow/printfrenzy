@@ -1,135 +1,243 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+
+type PricingMode = 'SIMPLE' | 'LAYERED' | 'PRINTED';
+
+interface PricingPreset {
+  label: string;
+  minRate: number;
+  maxRate: number;
+  defaultRate: number;
+  description: string;
+}
+
+const PRESETS: Record<PricingMode, PricingPreset> = {
+  SIMPLE: {
+    label: '1-Color Cut',
+    minRate: 0.40,
+    maxRate: 0.75,
+    defaultRate: 0.60,
+    description: 'Basic single-color vinyl decals.'
+  },
+  LAYERED: {
+    label: 'Layered / Multi',
+    minRate: 0.75,
+    maxRate: 1.50,
+    defaultRate: 1.00,
+    description: 'Multiple colors layered together.'
+  },
+  PRINTED: {
+    label: 'Printed & Lami',
+    minRate: 0.60,
+    maxRate: 1.25,
+    defaultRate: 0.85,
+    description: 'Full color print with lamination.'
+  }
+};
 
 export default function VinylCalculator() {
   const router = useRouter();
-  const [width, setWidth] = useState<number>(24);
-  const [height, setHeight] = useState<number>(12);
-  const [pricePerSqFt, setPricePerSqFt] = useState<number>(2.50);
+  const [width, setWidth] = useState<number>(10);
+  const [height, setHeight] = useState<number>(8);
+  const [mode, setMode] = useState<PricingMode>('SIMPLE');
+  const [rate, setRate] = useState<number>(PRESETS.SIMPLE.defaultRate);
+  const [setupFee, setSetupFee] = useState<number>(10);
+  const [minCharge, setMinCharge] = useState<number>(25);
   const [quantity, setQuantity] = useState<number>(1);
-  const [margin, setMargin] = useState<number>(10); // 10% waste
+  const [weedingDifficulty, setWeedingDifficulty] = useState<number>(0); // 0-100% extra
 
-  const sqFt = (width * height) / 144;
-  const totalSqFt = sqFt * quantity;
-  const subtotal = totalSqFt * pricePerSqFt;
-  const totalCost = subtotal * (1 + margin / 100);
+  const handleModeChange = (newMode: PricingMode) => {
+    setMode(newMode);
+    setRate(PRESETS[newMode].defaultRate);
+  };
+
+  const calculation = useMemo(() => {
+    const sqIn = width * height;
+    const basePricePerUnit = sqIn * rate;
+    const weedingExtra = basePricePerUnit * (weedingDifficulty / 100);
+    const unitPrice = basePricePerUnit + weedingExtra;
+    
+    let totalItemsPrice = unitPrice * quantity;
+    const subtotal = totalItemsPrice + setupFee;
+    const finalTotal = Math.max(subtotal, minCharge);
+    const isMinApplied = subtotal < minCharge;
+
+    return {
+      sqIn,
+      unitPrice,
+      totalItemsPrice,
+      subtotal,
+      finalTotal,
+      isMinApplied,
+      weedingExtra
+    };
+  }, [width, height, rate, setupFee, minCharge, quantity, weedingDifficulty]);
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 md:p-16">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <header className="flex items-center gap-4 mb-12">
             <button onClick={() => router.back()} className="h-12 w-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400 hover:text-blue-600 transition-all shadow-sm">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
             <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Production Tools</p>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">Vinyl Cost Calculator</h1>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">RGC Production Tools</p>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tighter italic uppercase">Vinyl Sign Pricing Calc</h1>
             </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Inputs */}
-            <div className="bg-white rounded-[2.5rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100 space-y-8">
-                <div className="space-y-4">
-                    <div className="flex justify-between items-end">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Width (Inches)</label>
-                        <input 
-                            type="number" 
-                            value={width} 
-                            onChange={(e) => setWidth(Number(e.target.value))}
-                            className="w-20 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-right font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <input 
-                        type="range" min="1" max="120" step="0.5"
-                        value={width} onChange={(e) => setWidth(Number(e.target.value))}
-                        className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Presets & Config */}
+            <div className="lg:col-span-2 space-y-8">
+                {/* Mode Selector */}
+                <div className="grid grid-cols-3 gap-4">
+                    {(Object.keys(PRESETS) as PricingMode[]).map((m) => (
+                        <button
+                            key={m}
+                            onClick={() => handleModeChange(m)}
+                            className={`p-6 rounded-[2rem] border-2 transition-all text-left flex flex-col justify-between h-40 ${
+                                mode === m 
+                                ? 'bg-slate-900 border-slate-900 text-white shadow-xl scale-[1.02]' 
+                                : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
+                            }`}
+                        >
+                            <span className="text-[10px] font-black uppercase tracking-widest">{PRESETS[m].label}</span>
+                            <div>
+                                <p className={`text-2xl font-black italic tracking-tighter ${mode === m ? 'text-blue-400' : 'text-slate-900'}`}>
+                                    ${PRESETS[m].defaultRate}<span className="text-[10px] uppercase font-bold ml-1">/ sq in</span>
+                                </p>
+                                <p className="text-[9px] font-bold opacity-60 mt-1 leading-tight">{PRESETS[m].description}</p>
+                            </div>
+                        </button>
+                    ))}
                 </div>
 
-                <div className="space-y-4">
-                    <div className="flex justify-between items-end">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Height (Inches)</label>
-                        <input 
-                            type="number" 
-                            value={height} 
-                            onChange={(e) => setHeight(Number(e.target.value))}
-                            className="w-20 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-right font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <input 
-                        type="range" min="1" max="120" step="0.5"
-                        value={height} onChange={(e) => setHeight(Number(e.target.value))}
-                        className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Price Per Sq Ft</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                {/* Primary Inputs */}
+                <div className="bg-white rounded-[2.5rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div className="space-y-8">
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-end">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Width (Inches)</label>
+                                <input 
+                                    type="number" value={width} onChange={(e) => setWidth(Number(e.target.value))}
+                                    className="w-20 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-right font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
                             <input 
-                                type="number" step="0.01"
-                                value={pricePerSqFt} 
-                                onChange={(e) => setPricePerSqFt(Number(e.target.value))}
-                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-8 pr-4 py-4 font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                type="range" min="1" max="120" step="0.25"
+                                value={width} onChange={(e) => setWidth(Number(e.target.value))}
+                                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-end">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Height (Inches)</label>
+                                <input 
+                                    type="number" value={height} onChange={(e) => setHeight(Number(e.target.value))}
+                                    className="w-20 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-right font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <input 
+                                type="range" min="1" max="120" step="0.25"
+                                value={height} onChange={(e) => setHeight(Number(e.target.value))}
+                                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-end">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Weeding Difficulty (+{weedingDifficulty}%)</label>
+                            </div>
+                            <input 
+                                type="range" min="0" max="200" step="10"
+                                value={weedingDifficulty} onChange={(e) => setWeedingDifficulty(Number(e.target.value))}
+                                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-amber-500"
                             />
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity</label>
-                        <input 
-                            type="number" 
-                            value={quantity} 
-                            onChange={(e) => setQuantity(Number(e.target.value))}
-                            className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                </div>
 
-                <div className="space-y-4">
-                    <div className="flex justify-between items-end">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Waste Margin (%)</label>
-                        <span className="font-black text-slate-900">{margin}%</span>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Custom Rate ($/sq in)</label>
+                            <input 
+                                type="number" step="0.01" value={rate} onChange={(e) => setRate(Number(e.target.value))}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <p className="text-[9px] font-bold text-slate-400 italic">Range: ${PRESETS[mode].minRate} - ${PRESETS[mode].maxRate}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Setup Fee</label>
+                                <input 
+                                    type="number" value={setupFee} onChange={(e) => setSetupFee(Number(e.target.value))}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Min Charge</label>
+                                <input 
+                                    type="number" value={minCharge} onChange={(e) => setMinCharge(Number(e.target.value))}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity</label>
+                            <input 
+                                type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
                     </div>
-                    <input 
-                        type="range" min="0" max="100" step="5"
-                        value={margin} onChange={(e) => setMargin(Number(e.target.value))}
-                        className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-slate-900"
-                    />
                 </div>
             </div>
 
             {/* Results */}
             <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-blue-200 flex flex-col justify-between">
-                <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-8">Calculation Result</p>
+                <div className="space-y-8">
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">RGC Pricing Engine</p>
                     
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                            <span className="text-slate-400 text-sm font-bold">Area Per Unit</span>
-                            <span className="text-xl font-black italic">{sqFt.toFixed(2)} SQ FT</span>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-slate-400">
+                            <span className="text-xs font-bold uppercase">Total Area</span>
+                            <span className="text-lg font-black italic text-white">{calculation.sqIn.toFixed(2)} SQ IN</span>
                         </div>
-                        <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                            <span className="text-slate-400 text-sm font-bold">Total Material</span>
-                            <span className="text-xl font-black italic">{totalSqFt.toFixed(2)} SQ FT</span>
+                        <div className="flex justify-between items-center text-slate-400">
+                            <span className="text-xs font-bold uppercase">Unit Price</span>
+                            <span className="text-lg font-black italic text-white">${calculation.unitPrice.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                            <span className="text-slate-400 text-sm font-bold">Price Basis</span>
-                            <span className="text-xl font-black italic">${pricePerSqFt.toFixed(2)} / FT²</span>
+                        <div className="flex justify-between items-center text-slate-400 border-t border-white/10 pt-4">
+                            <span className="text-xs font-bold uppercase">Base Total</span>
+                            <span className="text-lg font-black italic text-white">${calculation.totalItemsPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-400">
+                            <span className="text-xs font-bold uppercase">Setup Fee</span>
+                            <span className="text-lg font-black italic text-white">${setupFee.toFixed(2)}</span>
                         </div>
                     </div>
+
+                    {calculation.isMinApplied && (
+                        <div className="bg-blue-600/20 border border-blue-600/50 p-4 rounded-2xl animate-pulse">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-1">Minimum Applied</p>
+                            <p className="text-xs font-bold text-white leading-tight">Subtotal of ${calculation.subtotal.toFixed(2)} was below shop minimum.</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="mt-12">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Estimated Production Cost</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Total Customer Quote</p>
                     <div className="text-7xl font-black tracking-tighter italic text-blue-500">
-                        ${totalCost.toFixed(2)}
+                        ${calculation.finalTotal.toFixed(2)}
                     </div>
-                    <p className="text-[10px] font-bold text-slate-500 mt-4 uppercase italic">Includes {margin}% waste factor</p>
+                    <div className="flex items-center gap-2 mt-4">
+                        <span className="h-2 w-2 bg-green-500 rounded-full"></span>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase italic">Consistent Profit Margin Enabled</p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = 'edge';
 
 async function sanitizeError(e: unknown, context: Record<string, any> = {}): Promise<NextResponse> {
+  const traceId = generateTraceId();
   const message = e instanceof Error ? e.message : "Unknown error";
-  await log.error("Shipping API failure", { error: message, ...context });
-  return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  await log.error("Shipping API failure", { traceId, error: message, ...context });
+  return NextResponse.json({ error: "Internal server error", traceId }, { status: 500 });
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {

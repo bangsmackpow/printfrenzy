@@ -1,19 +1,34 @@
 # Project Status - PrintFrenzy
 
-## 🚀 Recent Major Updates (April 23, 2026 — Session 4)
+## 🚀 Recent Major Updates (April 27, 2026 — Session 5)
 
-### 15. 📈 High-Signal Observability (Axiom Integration)
-- **Axiom Streaming**: Integrated Axiom logging across all critical production endpoints (Uploads, Shipping, Order Imports, Wix Sync).
-- **Silent Failure Visibility**: Replaced standard `console.error` with `log.error` to Axiom, providing "after the fact" debugging for edge runtime execution failures.
-- **Rich Event Context**: Every log entry captures user email, filename, file size, and third-party API responses (Shippo/Wix).
-- **Edge-Compatible Logger**: Built a lightweight `src/utils/logger.ts` that uses standard `fetch` to keep cold starts fast and memory usage low.
+### 17. 📏 RGC Vinyl Pricing Engine (Calculator v2)
+- **Hybrid Pricing Model**: Replaced simple square-foot pricing with a pro-grade "Per Square Inch" engine.
+- **Smart Presets**: One-click modes for `1-Color Cut` ($0.60/sq in), `Layered/Multi` ($1.00/sq in), and `Printed & Lami` ($0.85/sq in).
+- **Advanced Cost Factors**: 
+    - **Weeding Difficulty**: Slider to add up to 200% labor overhead for complex designs.
+    - **Minimum Charges**: Configurable shop minimums (default $25) to protect margins on tiny jobs.
+    - **Setup Fees**: Flat-rate design/prep fee integration.
+- **Detailed Quote Breakdown**: Shows base total, setup fees, and minimum charge adjustments in a high-contrast dark mode display.
 
-### 16. 📦 Enhanced Upload & PDF Support
-- **Increased Capacity**: Boosted `MAX_FILE_SIZE` from 10MB to **20MB** in response to high-resolution artwork needs.
-- **Universal PDF Support**: Enabled `.pdf` file uploads in both the New Order and Edit Order UI.
-- **Backend Validation**: Updated magic-byte validation and MIME whitelist to robustly support PDF while maintaining security.
+### 18. 🍎 Apple HEIC Image Support
+- **Mobile Compatibility**: Added support for `.heic` and `.heif` files, allowing staff to upload airdropped photos directly from iPhones.
+- **Magic-Byte Bypass**: Implemented a targeted validation bypass for HEIC/HEIF containers (which vary by device) while maintaining strict validation for PNG/JPEG/PDF.
+- **MIME Whitelist**: Expanded backend whitelist to include HEIC formats.
+
+### 19. 🛠️ "Auto-Heal" & High-Signal Error Handling
+- **Trace IDs (Support Codes)**: Every 500 error now generates a unique ID (e.g., `PF-A1B2`).
+- **Support-Ready UI**: When an error occurs, the user is given a "Support ID" and a "Copy Diagnostic Data" button.
+- **Diagnostic Payloads**: One-click copying of error context (Trace ID, URL, parameters, timestamp) to help staff report bugs with 100% precision.
+- **Resilient Shipping**: 
+    - **Duplicate Prevention**: Auto-recovers existing labels if a user retries a purchase within 2 minutes.
+    - **Post-Purchase Safety**: If the database fails after a successful charge, the app now returns the label anyway, preventing double-billing.
+- **SQL Hardening**: Fixed a critical parameter binding mismatch in the shipping API that was causing silent data loss.
 
 ---
+
+## 🚀 Recent Major Updates (April 23, 2026 — Session 4)
+...
 
 ## 🚀 Recent Major Updates (April 20, 2026 — Session 3)
 

@@ -48,6 +48,10 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 11. **Shipping Audit Log Entries**: `SHIPMENT_CREATED` action type logged on label purchase. Captures tracking number, destination, user email. Green badge in audit UI.
 12. **Stats Intelligence**: `/api/admin/stats` provides daily order aggregates for the last 7 days for production velocity monitoring.
 13. **Observability Pass**: Integrated Axiom logging across all critical API routes (Upload, Shipping, Orders, Sync) for "after the fact" debugging of silent failures.
+14. **Vinyl Pricing Engine**: Square-inch based calculator with mode-based presets (Simple, Layered, Printed), setup fees, and shop minimums.
+15. **HEIC Support**: Apple device image compatibility for uploads.
+16. **Trace ID System**: Unique PF-XXXX codes for 500 errors to streamline debugging.
+17. **Shipping Resiliency**: Auto-recovery of recent labels and post-charge success guarantee.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
@@ -88,6 +92,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 ### Utilities
 - `src/utils/hashUtils.ts` — PBKDF2 600k iterations
 - `src/utils/logger.ts` — Axiom integration utility
+- `src/utils/trace.ts` — Trace ID generation
 - `src/utils/backupUtils.ts` — excludes password_hash
 - `src/utils/wixUtils.ts` — image URL transformation
 

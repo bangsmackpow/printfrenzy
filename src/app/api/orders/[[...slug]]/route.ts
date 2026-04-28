@@ -53,9 +53,10 @@ function parseCSV(text: string) {
 }
 
 async function sanitizeError(e: unknown, context: Record<string, any> = {}): Promise<NextResponse> {
+  const traceId = generateTraceId();
   const message = e instanceof Error ? e.message : "Unknown error";
-  await log.error("Orders API failure", { error: message, ...context });
-  return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  await log.error("Orders API failure", { traceId, error: message, ...context });
+  return NextResponse.json({ error: "Internal server error", traceId }, { status: 500 });
 }
 
 function isValidHttpsUrl(str: string): boolean {
