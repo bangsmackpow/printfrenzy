@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = 'edge';
 

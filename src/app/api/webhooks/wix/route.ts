@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac, timingSafeEqual } from 'crypto';
 
 export const runtime = 'edge';
 
@@ -8,19 +7,42 @@ function sanitizeError(e: unknown): never {
   return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
 }
 
+// Constant-time comparison for strings/buffers
+function constantTimeCompare(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
+}
+
 async function verifyWixSignature(payload: string, signature: string, secret: string): Promise<boolean> {
   try {
     const [algorithm, hash] = signature.split('=');
     if (algorithm !== 'sha256') return false;
 
-    const hmac = createHmac('sha256', secret);
-    hmac.update(payload);
-    const computedHash = hmac.digest('hex');
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const data = encoder.encode(payload);
 
-    const computedBuffer = Buffer.from(computedHash, 'utf-8');
-    const receivedBuffer = Buffer.from(hash, 'utf-8');
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
 
-    return timingSafeEqual(computedBuffer, receivedBuffer);
+    const signatureBuffer = await crypto.subtle.sign('HMAC', key, data);
+    const computedHash = Array.from(new Uint8Array(signatureBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const computedBuffer = encoder.encode(computedHash);
+    const receivedBuffer = encoder.encode(hash);
+
+    return constantTimeCompare(computedBuffer, receivedBuffer);
   } catch {
     return false;
   }
