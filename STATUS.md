@@ -25,6 +25,12 @@
     - **Post-Purchase Safety**: If the database fails after a successful charge, the app now returns the label anyway, preventing double-billing.
 - **SQL Hardening**: Fixed a critical parameter binding mismatch in the shipping API that was causing silent data loss.
 
+### 20. 📑 Professional Customer Quoting
+- **Quote Notes**: Added a free-form "Notes for Customer" area to the Vinyl Calculator for material specs and disclaimers.
+- **Print-to-PDF Template**: Engineered a professional, branded quote layout (`@media print`) for customer-facing PDFs.
+- **Auto-Generated Ref IDs**: Every quote includes a unique reference timestamp for tracking.
+- **Branded Header**: Quotes feature "RGC SIGNS" branding with clean typography optimized for 2'x3' and larger job estimates.
+
 ---
 
 ## 🚀 Recent Major Updates (April 23, 2026 — Session 4)
