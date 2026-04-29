@@ -47,6 +47,7 @@ export default function VinylCalculator() {
   const [minCharge, setMinCharge] = useState<number>(25);
   const [quantity, setQuantity] = useState<number>(1);
   const [weedingDifficulty, setWeedingDifficulty] = useState<number>(0); // 0-100% extra
+  const [quoteNotes, setQuoteNotes] = useState<string>("");
 
   const handleModeChange = (newMode: PricingMode) => {
     setMode(newMode);
@@ -195,10 +196,22 @@ export default function VinylCalculator() {
                         </div>
                     </div>
                 </div>
+
+                {/* Quote Notes */}
+                <div className="bg-white rounded-[2.5rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100 space-y-4 no-print">
+                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Quote Notes (For Customer)</label>
+                    <textarea 
+                        value={quoteNotes}
+                        onChange={(e) => setQuoteNotes(e.target.value)}
+                        placeholder="Additional details about the material, finish, or installation..."
+                        rows={4}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                    />
+                </div>
             </div>
 
             {/* Results */}
-            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-blue-200 flex flex-col justify-between">
+            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-blue-200 flex flex-col justify-between h-fit lg:sticky lg:top-8">
                 <div className="space-y-8">
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">RGC Pricing Engine</p>
                     
@@ -238,10 +251,79 @@ export default function VinylCalculator() {
                         <span className="h-2 w-2 bg-green-500 rounded-full"></span>
                         <p className="text-[10px] font-bold text-slate-500 uppercase italic">Consistent Profit Margin Enabled</p>
                     </div>
+
+                    <button 
+                        onClick={() => window.print()}
+                        className="w-full mt-10 bg-white text-slate-900 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-500 hover:text-white transition-all shadow-lg flex items-center justify-center gap-3 no-print"
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 00-2 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3a2 2 0 002 2zm0 0v-9a2 2 0 012-2h6a2 2 0 012 2v9m-8-3h4" /></svg>
+                        Print PDF Quote
+                    </button>
                 </div>
             </div>
         </div>
       </div>
+
+      {/* Printable Quote Sheet */}
+      <div className="print-only fixed inset-0 bg-white text-black p-12 z-[200]">
+          <div className="max-w-3xl mx-auto space-y-12">
+              <header className="flex justify-between items-start border-b-4 border-black pb-8">
+                  <div>
+                      <h1 className="text-4xl font-black uppercase italic tracking-tighter">Production Quote</h1>
+                      <p className="text-slate-500 font-bold mt-1">Ref: {new Date().getTime().toString().slice(-6)}</p>
+                  </div>
+                  <div className="text-right">
+                      <p className="text-2xl font-black italic">RGC SIGNS</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">{new Date().toLocaleDateString()}</p>
+                  </div>
+              </header>
+
+              <div className="grid grid-cols-2 gap-12">
+                  <div className="space-y-6">
+                      <div>
+                          <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Service Type</p>
+                          <p className="text-xl font-black uppercase italic">{PRESETS[mode].label}</p>
+                      </div>
+                      <div>
+                          <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Dimensions</p>
+                          <p className="text-xl font-black italic">{width}" x {height}" ({calculation.sqIn.toFixed(1)} sq in)</p>
+                      </div>
+                      <div>
+                          <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Quantity</p>
+                          <p className="text-xl font-black italic">x{quantity}</p>
+                      </div>
+                  </div>
+                  <div className="bg-slate-50 p-8 rounded-3xl border-2 border-slate-100 flex flex-col justify-center text-center">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Estimated Total</p>
+                      <p className="text-6xl font-black italic tracking-tighter">${calculation.finalTotal.toFixed(2)}</p>
+                      {calculation.isMinApplied && (
+                          <p className="text-[9px] font-black uppercase text-blue-600 mt-2">Shop Minimum Applied</p>
+                      )}
+                  </div>
+              </div>
+
+              {quoteNotes && (
+                  <div className="space-y-2 pt-8 border-t-2 border-slate-100">
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Additional Notes</p>
+                      <p className="text-lg font-bold text-slate-800 leading-relaxed whitespace-pre-wrap italic">"{quoteNotes}"</p>
+                  </div>
+              )}
+
+              <footer className="pt-20 border-t-2 border-slate-100 flex justify-between items-end opacity-40">
+                  <p className="text-[10px] font-black uppercase tracking-widest">Quote valid for 30 days</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest italic">Generated by PrintFrenzy</p>
+              </footer>
+          </div>
+      </div>
+
+      <style jsx global>{`
+        .print-only { display: none; }
+        @media print {
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          body { background: white !important; margin: 0 !important; padding: 0 !important; }
+        }
+      `}</style>
     </div>
   );
 }
