@@ -49,10 +49,11 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 12. **Stats Intelligence**: `/api/admin/stats` provides daily order aggregates for the last 7 days for production velocity monitoring.
 13. **Observability Pass**: Integrated Axiom logging across all critical API routes (Upload, Shipping, Orders, Sync) for "after the fact" debugging of silent failures.
 15. **Vinyl Pricing Engine**: Square-inch based calculator with mode-based presets (Simple, Layered, Printed), setup fees, and shop minimums. Includes a **Professional Quoting** system with free-form notes and Print-to-PDF branding.
-16. **HEIC Support**: Apple device image compatibility for uploads.
-17. **Trace ID System**: Unique PF-XXXX codes for 500 errors to streamline debugging.
-18. **Shipping Resiliency**: Auto-recovery of recent labels and post-charge success guarantee.
-19. **Security Compliance**: OWASP Top 10 verified; core dependencies (Next.js, Auth.js) updated to latest secure versions.
+16. **Expanded Image Support**: Added support for `.avif`, `.svg`, `.bmp`, and `.tiff` uploads for manual orders. Backend includes magic-byte validation for BMP/TIFF and a validation bypass for complex AVIF/SVG containers.
+17. **HEIC Support**: Apple device image compatibility for uploads.
+18. **Trace ID System**: Unique PF-XXXX codes for 500 errors to streamline debugging.
+19. **Shipping Resiliency**: Auto-recovery of recent labels and post-charge success guarantee.
+20. **Security Compliance**: OWASP Top 10 verified; core dependencies (Next.js, Auth.js) updated to latest secure versions.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
