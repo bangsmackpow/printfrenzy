@@ -67,7 +67,7 @@ Protecting the production data and team access:
 - **Apple HEIC Support**: Support for `.heic` and `.heif` image uploads from mobile devices.
 - **Trace ID & Diagnostic UI**: Unique support codes for all errors with one-click diagnostic data export for staff.
 - **Shipping Resiliency**: Duplicate charge prevention and post-purchase database auto-recovery.
-- **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (including PDF) and magic-byte validation.
+- **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (PNG, JPEG, WEBP, GIF, PDF, HEIC, HEIF, AVIF, SVG, BMP, TIFF) and magic-byte validation.
 - **Axiom Logging**: High-signal event streaming for uploads, shipping, and order imports to Axiom for "after the fact" debugging.
 
 ⏳ **In Progress / Next Phase**:

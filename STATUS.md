@@ -1,5 +1,14 @@
 # Project Status - PrintFrenzy
 
+### 21. 🖼️ Expanded Image Format Support
+- **New Formats**: Added support for `.avif`, `.svg`, `.bmp`, and `.tiff` image uploads for manual orders.
+- **Clipart Optimization**: SVG support enables high-quality vector clipart uploads with full transparency.
+- **Backend Validation**: Updated `ALLOWED_MIME_TYPES` and `MAGIC_BYTES` to include the new formats.
+- **Variable Container Support**: Implemented a validation bypass for AVIF and SVG to handle complex/variable file headers while maintaining strict checks for standard formats.
+- **Frontend Integration**: Updated manual order and edit order pages with explicit file type selection for the new formats.
+
+---
+
 ## 🚀 Recent Major Updates (April 27, 2026 — Session 5)
 
 ### 17. 📏 RGC Vinyl Pricing Engine (Calculator v2)
