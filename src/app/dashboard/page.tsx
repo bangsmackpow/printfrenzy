@@ -152,15 +152,35 @@ function DashboardContent() {
     }
   };
 
-  const deleteGroup = async (orderNumber: string) => {
-    if (!confirm(`Are you sure you want to delete Batch #${orderNumber}?`)) return;
+  const deleteGroup = async (orderNumber: string, itemCount: number) => {
+    if (!confirm(`⚠️ This will permanently delete ALL ${itemCount} items in Batch #${orderNumber}.\n\nThis cannot be undone.`)) return;
     try {
       const res = await fetch(`/api/orders/delete?order_number=${orderNumber}`, { method: 'DELETE' });
       if (res.ok) {
         setItems(prev => prev.filter(item => item.order_number !== orderNumber));
+      } else {
+        const data = await res.json();
+        alert(`Delete failed: ${data.error}`);
       }
     } catch (err) {
       console.error("Delete error:", err);
+      alert("Delete failed. Check with an administrator.");
+    }
+  };
+
+  const deleteItem = async (id: string, orderNumber: string) => {
+    if (!confirm(`Delete this item from Batch #${orderNumber}?`)) return;
+    try {
+      const res = await fetch(`/api/orders/delete?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setItems(prev => prev.filter(item => item.id !== id));
+      } else {
+        const data = await res.json();
+        alert(`Delete failed: ${data.error}`);
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Delete failed. Check with an administrator.");
     }
   };
 
@@ -360,10 +380,11 @@ function DashboardContent() {
                     </button>
                     {(session?.user as { role?: string })?.role === 'ADMIN' || (session?.user as { role?: string })?.role === 'MANAGER' ? (
                         <button 
-                            onClick={() => deleteGroup(orderNum)}
-                            className="p-3 bg-white border border-slate-200 text-slate-300 rounded-2xl hover:text-red-500 hover:border-red-100 transition-all shadow-sm"
+                            onClick={() => deleteGroup(orderNum, items.length)}
+                            className="px-4 py-3 bg-red-50 border border-red-200 text-red-400 rounded-2xl hover:text-red-600 hover:border-red-300 hover:bg-red-100 transition-all shadow-sm font-black uppercase text-[9px] tracking-widest"
+                            title="Delete entire batch"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h14" /></svg>
+                            Delete Batch ({items.length})
                         </button>
                     ) : null}
                   </div>
@@ -447,6 +468,15 @@ function DashboardContent() {
                                 {item.variant || 'Standard'}
                             </span>
                         </div>
+
+                        {((session?.user as { role?: string })?.role === 'ADMIN' || (session?.user as { role?: string })?.role === 'MANAGER') && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteItem(item.id, orderNum); }}
+                            className="mb-4 w-full py-2 bg-red-50 border border-red-100 text-red-400 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-100 hover:text-red-600 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            Remove Item
+                          </button>
+                        )}
 
                         <div className="mt-auto space-y-2">
                             <div className="flex justify-between items-end mb-1 px-1">

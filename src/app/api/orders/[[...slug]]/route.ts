@@ -406,19 +406,23 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
     try {
       if (id) {
         const existing = await db.prepare("SELECT order_number FROM orders WHERE id = ?").bind(id).first() as { order_number: string } | null;
+        await db.prepare("PRAGMA foreign_keys = OFF").run();
         await db.batch([
+          db.prepare("DELETE FROM orders WHERE id = ?").bind(id),
           db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id),
-          db.prepare("DELETE FROM orders WHERE id = ?").bind(id)
         ]);
+        await db.prepare("PRAGMA foreign_keys = ON").run();
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
           .bind(id, existing?.order_number || id, session?.user?.email || "SYSTEM", JSON.stringify({ order_number: existing?.order_number })).run();
       } else if (orderNumber) {
         const ordersToDelete = await db.prepare("SELECT id, order_number FROM orders WHERE order_number = ?").bind(orderNumber).all();
+        await db.prepare("PRAGMA foreign_keys = OFF").run();
         await db.batch([
+          db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber),
           db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber),
           db.prepare("DELETE FROM shipments WHERE order_number = ?").bind(orderNumber),
-          db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber)
         ]);
+        await db.prepare("PRAGMA foreign_keys = ON").run();
         const userEmail = session?.user?.email || "SYSTEM";
         for (const order of (ordersToDelete.results as { id: string; order_number: string }[])) {
           await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
