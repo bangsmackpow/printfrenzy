@@ -54,6 +54,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 18. **Trace ID System**: Unique PF-XXXX codes for 500 errors to streamline debugging.
 19. **Shipping Resiliency**: Auto-recovery of recent labels and post-charge success guarantee.
 20. **Security Compliance**: OWASP Top 10 verified; core dependencies (Next.js, Auth.js) updated to latest secure versions.
+21. **Single-Item Delete Fix**: Fixed bug where deleting one item from a multi-item batch deleted the entire batch. Resolved `FOREIGN KEY constraint failed` error via `PRAGMA foreign_keys` toggle. Dashboard now has per-item "Remove Item" button (hover-reveal, ADMIN/MANAGER) and improved batch delete UX with item count and explicit confirm dialog.
 
 ### Pending / Future
 - Email notifications for critical stage transitions

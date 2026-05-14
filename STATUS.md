@@ -1,5 +1,14 @@
 # Project Status - PrintFrenzy
 
+### 22. 🗑️ Single-Item Delete Fix (Live)
+- **Batch Deletion Bug Fixed**: Deleting a single item from a multi-item order/batch no longer deletes the entire batch.
+- **FOREIGN KEY Constraint Resolved**: Fixed `D1_ERROR: FOREIGN KEY constraint failed` by wrapping delete batches in `PRAGMA foreign_keys = OFF/ON` to handle `audit_logs` FK dependency correctly.
+- **Per-Item Delete Button**: Added hover-reveal "Remove Item" button on dashboard cards (ADMIN/MANAGER only).
+- **Improved Batch Delete UX**: Batch delete button now shows item count ("Delete Batch (N)"), uses red styling, and displays explicit confirmation dialog.
+- **Error Handling**: Both delete paths now show user-friendly error messages on failure.
+
+---
+
 ### 21. 🖼️ Expanded Image Format Support
 - **New Formats**: Added support for `.avif`, `.svg`, `.bmp`, and `.tiff` image uploads for manual orders.
 - **Clipart Optimization**: SVG support enables high-quality vector clipart uploads with full transparency.
