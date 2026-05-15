@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { hashPassword, verifyPassword } from "@/utils/hashUtils";
+import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = 'edge';
 
@@ -25,8 +27,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   if (slug?.[0] === 'users') {
     try {
       const results = await db.prepare("SELECT id, email, role, created_at FROM users ORDER BY created_at DESC").all();
+      log.info("admin_users_list", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        role,
+        userCount: results.results?.length || 0,
+      });
       return NextResponse.json(results.results);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_users_list_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'audit') {
@@ -61,15 +76,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       bindParams.push(limit);
       
       const results = await db.prepare(query).bind(...bindParams).all();
+      log.info("admin_audit_query", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        role,
+        actionType: actionType || 'all',
+        filterUserEmail: userEmail || 'all',
+        limit,
+        resultCount: results.results?.length || 0,
+      });
       return NextResponse.json(results.results);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_audit_query_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
   
   if (slug?.[0] === 'audit' && slug?.[1] === 'users') {
     try {
       const results = await db.prepare("SELECT DISTINCT user_email FROM audit_logs WHERE user_email != 'SYSTEM' ORDER BY user_email ASC").all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_audit_users_list_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'stats') {
@@ -82,7 +120,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
         ORDER BY date DESC
       `).all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_stats_query_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -106,18 +151,47 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       if (newRole && !VALID_ROLES.includes(newRole)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
 
       const hashedPassword = await hashPassword(password);
+      const userId = crypto.randomUUID();
       await db.prepare("INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)")
-        .bind(crypto.randomUUID(), email, hashedPassword, newRole || 'USER').run();
+        .bind(userId, email, hashedPassword, newRole || 'USER').run();
+      log.info("admin_user_created", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        role,
+        newUserId: userId,
+        newUserEmail: email,
+        newUserRole: newRole || 'USER',
+      });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_user_create_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'backfill-images') {
     try {
       const before = await db.prepare("SELECT COUNT(*) as count FROM orders WHERE image_url IS NULL OR image_url = ''").first() as { count: number };
       await db.prepare("UPDATE orders SET image_url = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg' WHERE image_url IS NULL OR image_url = ''").run();
+      log.info("admin_backfill_images", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        role,
+        imagesBackfilled: before.count,
+      });
       return NextResponse.json({ success: true, updated: before.count });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_backfill_images_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'clear') {
@@ -126,6 +200,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const adminEmail = session.user?.email;
       const adminUser = await db.prepare("SELECT password_hash FROM users WHERE email = ?").bind(adminEmail).first() as { password_hash: string } | null;
       if (!adminUser || !(await verifyPassword(password, adminUser.password_hash))) {
+        log.warn("admin_clear_rejected_invalid_password", {
+          traceId: generateTraceId(),
+          userEmail: adminEmail,
+        });
         return NextResponse.json({ error: "Invalid admin password" }, { status: 401 });
       }
       const orderCount = await db.prepare("SELECT COUNT(*) as count FROM orders").first() as { count: number };
@@ -133,8 +211,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("DELETE FROM shipments").run();
       await db.prepare("INSERT INTO audit_logs (user_email, action_type, action, details) VALUES (?, 'SYSTEM_CLEAR', 'All orders cleared', ?)")
         .bind(adminEmail, JSON.stringify({ orders_cleared: orderCount.count })).run();
+      log.info("admin_clear_executed", {
+        traceId: generateTraceId(),
+        userEmail: adminEmail,
+        role,
+        ordersCleared: orderCount.count,
+        shipmentsCleared: true,
+      });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_clear_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'users' && slug?.[1] === 'password') {
@@ -143,8 +235,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         if (!password || password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
         const hashedPassword = await hashPassword(password);
         await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(hashedPassword, id).run();
+        log.info("admin_user_password_reset", {
+          traceId: generateTraceId(),
+          userEmail: session.user?.email,
+          role,
+          targetUserId: id,
+        });
         return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      const { id } = await req.json().catch(() => ({}));
+      log.error("admin_user_password_reset_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        targetUserId: id,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'users' && slug?.[1] === 'email') {
@@ -152,8 +259,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         const { id, email } = await req.json();
         if (!email || !EMAIL_RE.test(email)) return NextResponse.json({ error: "Invalid email" }, { status: 400 });
         await db.prepare("UPDATE users SET email = ? WHERE id = ?").bind(email, id).run();
+        log.info("admin_user_email_updated", {
+          traceId: generateTraceId(),
+          userEmail: session.user?.email,
+          role,
+          targetUserId: id,
+          newEmail: email,
+        });
         return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      const { id } = await req.json().catch(() => ({}));
+      log.error("admin_user_email_update_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        targetUserId: id,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -174,8 +297,22 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
       const id = new URL(req.url).searchParams.get('id');
       if (!id) return NextResponse.json({ error: "No ID provided" }, { status: 400 });
       await db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+      log.info("admin_user_deleted", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        role,
+        deletedUserId: id,
+      });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      log.error("admin_user_delete_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        deletedUserId: new URL(req.url).searchParams.get('id'),
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });

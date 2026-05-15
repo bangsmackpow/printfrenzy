@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = 'edge';
 
@@ -29,9 +31,21 @@ export async function GET(req: NextRequest) {
        LIMIT 50`
     ).bind(term, term, term, term, term, term, term).all();
 
+    await log.info("search_executed", {
+      traceId: generateTraceId(),
+      userEmail: session.user?.email,
+      query: q.trim(),
+      resultCount: results.results?.length || 0,
+    });
+
     return NextResponse.json(results.results);
   } catch (e: unknown) {
-    if (e instanceof Error) console.error("Search error:", e.message);
+    await log.error("search_failed", {
+      traceId: generateTraceId(),
+      userEmail: session.user?.email,
+      query: q.trim(),
+      error: e instanceof Error ? e.message : 'Unknown',
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

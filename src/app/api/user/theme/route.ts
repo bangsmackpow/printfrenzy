@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = "edge";
 
@@ -20,9 +22,19 @@ export async function POST(req: Request) {
       .bind(theme, session.user.email)
       .run();
 
+    await log.info("user_theme_changed", {
+      traceId: generateTraceId(),
+      userEmail: session.user.email,
+      theme,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Theme update error:", error);
+    await log.error("user_theme_change_failed", {
+      traceId: generateTraceId(),
+      userEmail: session.user?.email,
+      error: error instanceof Error ? error.message : 'Unknown',
+    });
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

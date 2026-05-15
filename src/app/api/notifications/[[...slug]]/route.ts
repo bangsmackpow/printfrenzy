@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = 'edge';
 
@@ -22,7 +24,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     try {
       const results = await db.prepare("SELECT stage FROM notification_subscriptions WHERE user_email = ?").bind(email).all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      await log.error("notification_subscriptions_get_failed", {
+        traceId: generateTraceId(),
+        userEmail: email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'poll') {
@@ -42,7 +51,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       
       const results = await db.prepare(query).bind(...bindParams).all();
       return NextResponse.json(results.results);
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      await log.error("notification_poll_failed", {
+        traceId: generateTraceId(),
+        userEmail: email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
@@ -64,13 +80,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       if (subscribe) {
         await db.prepare("INSERT OR IGNORE INTO notification_subscriptions (user_email, stage) VALUES (?, ?)")
           .bind(email, stage).run();
+        await log.info("notification_subscribed", {
+          traceId: generateTraceId(),
+          userEmail: email,
+          stage,
+        });
       } else {
         await db.prepare("DELETE FROM notification_subscriptions WHERE user_email = ? AND stage = ?")
           .bind(email, stage).run();
+        await log.info("notification_unsubscribed", {
+          traceId: generateTraceId(),
+          userEmail: email,
+          stage,
+        });
       }
       
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      await log.error("notification_subscription_change_failed", {
+        traceId: generateTraceId(),
+        userEmail: email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   if (slug?.[0] === 'read') {
@@ -81,13 +114,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         const placeholders = ids.map(() => '?').join(',');
         await db.prepare(`UPDATE notifications SET read = 1 WHERE id IN (${placeholders}) AND user_email = ?`)
           .bind(...ids, email).run();
+        await log.info("notifications_marked_read", {
+          traceId: generateTraceId(),
+          userEmail: email,
+          count: ids.length,
+        });
       } else {
         await db.prepare("UPDATE notifications SET read = 1 WHERE user_email = ? AND read = 0")
           .bind(email).run();
+        await log.info("notifications_mark_all_read", {
+          traceId: generateTraceId(),
+          userEmail: email,
+        });
       }
       
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      await log.error("notification_mark_read_failed", {
+        traceId: generateTraceId(),
+        userEmail: email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });

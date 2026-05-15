@@ -29,7 +29,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       const shipment = await db.prepare("SELECT tracking_number, label_url FROM shipments WHERE order_number = ? AND customer_name = ? ORDER BY created_at DESC LIMIT 1")
         .bind(orderNumber, customerName).first();
       return NextResponse.json({ shipment });
-    } catch (e: unknown) { return sanitizeError(e, { orderNumber, customerName }); }
+    } catch (e: unknown) {
+      await log.error("shipping_status_lookup_failed", {
+        traceId: generateTraceId(),
+        orderNumber,
+        customerName,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e, { orderNumber, customerName });
+    }
   }
 
   try {

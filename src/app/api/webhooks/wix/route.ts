@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { log } from '@/utils/logger';
 
 export const runtime = 'edge';
 
 function sanitizeError(e: unknown): never {
-  if (e instanceof Error) console.error("Wix webhook error:", e.message);
+  const message = e instanceof Error ? e.message : "Unknown";
+  log.error("Wix webhook error", { error: message });
   return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
 }
 
@@ -51,17 +53,20 @@ async function verifyWixSignature(payload: string, signature: string, secret: st
 export async function POST(req: NextRequest) {
   const WIX_WEBHOOK_SECRET = process.env.WIX_WEBHOOK_SECRET;
   if (!WIX_WEBHOOK_SECRET) {
+    await log.error("Wix webhook: Webhook not configured", { missingEnv: "WIX_WEBHOOK_SECRET" });
     return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
   }
 
   const signature = req.headers.get('x-wix-signature');
   if (!signature) {
+    await log.warn("Wix webhook: Missing signature", { ip: req.headers.get('x-forwarded-for') || 'unknown' });
     return NextResponse.json({ error: "Missing signature" }, { status: 401 });
   }
 
   const rawBody = await req.text();
 
   if (!(await verifyWixSignature(rawBody, signature, WIX_WEBHOOK_SECRET))) {
+    await log.warn("Wix webhook: Invalid signature (potential tampering)", { ip: req.headers.get('x-forwarded-for') || 'unknown' });
     return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
   }
 
@@ -72,11 +77,13 @@ export async function POST(req: NextRequest) {
     const eventType = payload?.eventType || payload?.instance?.eventType;
 
     if (eventType !== 'wixstores:order' && eventType !== 'wixstores:order-created') {
+      await log.info("Wix webhook: Ignored non-order event", { eventType });
       return NextResponse.json({ success: true, message: "Ignored non-order event" });
     }
 
     const order = payload?.data?.data?.order || payload?.data?.order;
     if (!order) {
+      await log.warn("Wix webhook: Invalid payload", { eventType });
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
@@ -123,7 +130,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    console.log(`Wix webhook processed: ${addedCount} added, ${skippedCount} skipped for order ${orderNumber}`);
+    await log.info("Wix webhook processed", { orderNumber, added: addedCount, skipped: skippedCount, eventType });
 
     return NextResponse.json({ 
       success: true, 

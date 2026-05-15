@@ -1,6 +1,7 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { verifyPassword } from "@/utils/hashUtils";
+import { log } from "@/utils/logger";
 
 // Module augmentation to add 'role' to the session and user types
 declare module "next-auth" {
@@ -27,18 +28,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           
           const user = userQueryResult as { id: string; email: string; role: string; theme: string; password_hash: string } | null;
 
-          if (!user) return null;
+          if (!user) {
+            await log.warn("Login attempt failed: User not found", { email });
+            return null;
+          }
 
           const inputPass = (credentials?.password as string || "").trim();
           const isMatch = await verifyPassword(inputPass, user.password_hash);
 
           if (isMatch) {
+            await log.info("Login successful", { email, role: user.role, id: user.id });
             return { id: user.id, email: user.email, role: user.role, theme: user.theme || 'light' };
           }
           
+          await log.warn("Login attempt failed: Wrong password", { email, role: user.role });
           return null;
         } catch (error) {
-          console.error("Auth error:", error);
+          await log.error("Auth error", { error: error instanceof Error ? error.message : "Unknown" });
           return null;
         }
       },

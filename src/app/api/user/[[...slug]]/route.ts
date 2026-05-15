@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { verifyPassword, hashPassword } from "@/utils/hashUtils";
+import { log } from "@/utils/logger";
+import { generateTraceId } from "@/utils/trace";
 
 export const runtime = 'edge';
 
@@ -18,13 +20,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const { currentPassword, newPassword } = await req.json();
       const user = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first() as { password_hash: string } | null;
       if (!user || !(await verifyPassword(currentPassword, user.password_hash))) {
+        await log.warn("user_password_change_rejected", {
+          traceId: generateTraceId(),
+          userEmail: email,
+          reason: "incorrect_current_password",
+        });
         return NextResponse.json({ error: "Incorrect current password" }, { status: 400 });
       }
       const newHash = await hashPassword(newPassword);
       await db.prepare("UPDATE users SET password_hash = ? WHERE email = ?").bind(newHash, email).run();
+      await log.info("user_password_changed", {
+        traceId: generateTraceId(),
+        userEmail: email,
+      });
       return NextResponse.json({ success: true });
     } catch (e: unknown) {
-      if (e instanceof Error) console.error("User API error:", e.message);
+      await log.error("user_password_change_failed", {
+        traceId: generateTraceId(),
+        userEmail: email,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
   }

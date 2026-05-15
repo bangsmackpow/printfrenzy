@@ -229,8 +229,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         }
       }
       
+      await log.info("order_status_changed", {
+        traceId: generateTraceId(),
+        userEmail,
+        orderId: id,
+        orderNumber: existing?.order_number,
+        fromStatus: existing?.status,
+        toStatus: status,
+      });
+      
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
+    } catch (e: unknown) {
+      const { id } = await req.json().catch(() => ({}));
+      await log.error("order_status_change_failed", {
+        traceId: generateTraceId(),
+        userEmail,
+        orderId: id,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e, { user: userEmail, slug });
+    }
   }
 
   if (slug?.[0] === 'update-notes') {
@@ -244,8 +262,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
           .bind(existing.id, order_number, userEmail, JSON.stringify({ from: existing.notes, to: notes })).run();
       }
       
+      await log.info("order_notes_updated", {
+        traceId: generateTraceId(),
+        userEmail,
+        orderNumber: order_number,
+        orderId: existing?.id,
+      });
+      
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
+    } catch (e: unknown) {
+      const { order_number } = await req.json().catch(() => ({}));
+      await log.error("order_notes_update_failed", {
+        traceId: generateTraceId(),
+        userEmail,
+        orderNumber: order_number,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e, { user: userEmail, slug });
+    }
   }
 
   if (slug?.[0] === 'update-item') {
@@ -258,8 +292,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       } else if (notes !== undefined) {
         await db.prepare("UPDATE orders SET notes = ? WHERE id = ?").bind(notes, id).run();
       }
+      await log.info("order_item_updated", {
+        traceId: generateTraceId(),
+        userEmail,
+        orderId: id,
+        fieldsUpdated: { print_name: print_name !== undefined, notes: notes !== undefined },
+      });
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
+    } catch (e: unknown) {
+      const { id } = await req.json().catch(() => ({}));
+      await log.error("order_item_update_failed", {
+        traceId: generateTraceId(),
+        userEmail,
+        orderId: id,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e, { user: userEmail, slug });
+    }
   }
 
   if (slug?.[0] === 'sync') {
@@ -414,6 +463,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
         await db.prepare("PRAGMA foreign_keys = ON").run();
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
           .bind(id, existing?.order_number || id, session?.user?.email || "SYSTEM", JSON.stringify({ order_number: existing?.order_number })).run();
+        await log.info("order_deleted", {
+          traceId: generateTraceId(),
+          userEmail: session?.user?.email,
+          userRole,
+          orderId: id,
+          orderNumber: existing?.order_number,
+        });
       } else if (orderNumber) {
         const ordersToDelete = await db.prepare("SELECT id, order_number FROM orders WHERE order_number = ?").bind(orderNumber).all();
         await db.prepare("PRAGMA foreign_keys = OFF").run();
@@ -428,9 +484,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
           await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
             .bind(order.id, order.order_number, userEmail, JSON.stringify({ order_number: order.order_number })).run();
         }
+        await log.info("orders_deleted_by_number", {
+          traceId: generateTraceId(),
+          userEmail: session?.user?.email,
+          userRole,
+          orderNumber,
+          countDeleted: ordersToDelete.results?.length || 0,
+        });
       }
       return NextResponse.json({ success: true });
-    } catch (e: unknown) { return sanitizeError(e); }
+    } catch (e: unknown) {
+      await log.error("order_delete_failed", {
+        traceId: generateTraceId(),
+        userEmail: session?.user?.email,
+        orderId: id,
+        orderNumber,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
   }
 
   return NextResponse.json({ error: "Not Found" }, { status: 404 });
