@@ -32,12 +32,14 @@ Protecting the production data and team access:
 - **Individual Cleanup**: Admins can delete specific orders or entire Wix groups directly from the queue.
 
 ### 🛠️ Tech Stack (The "Bleeding Edge" Build)
-- **Framework**: Next.js 16.1.7 (Turbopack enabled)
+- **Framework**: Next.js 16.2.6 (Turbopack enabled)
 - **Runtime**: Cloudflare Pages (Edge Runtime)
 - **Database**: Cloudflare D1 (SQL)
 - **Storage**: Cloudflare R2 (S3-compatible)
-- **Auth**: Auth.js (v5 Beta)
-- **Styling**: Tailwind CSS 4
+- **Auth**: Auth.js v5 (`next-auth@5.0.0-beta.31`)
+- **UI**: React 19.2.3 + Tailwind CSS 4
+- **Language**: TypeScript 5
+- **Deploy**: Wrangler 4.74.0 + `@cloudflare/next-on-pages` 1.13.16
 
 ---
 

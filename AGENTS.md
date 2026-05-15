@@ -4,7 +4,7 @@
 
 DTF print queue & production management system. Handles order ingestion (Wix sync, CSV import, manual entry), print queue management with stage-based workflow, shipping label purchasing via Shippo, and production tracking.
 
-**Tech Stack**: Next.js 16 + Cloudflare Pages + D1 (SQLite) + R2 + Tailwind CSS
+**Tech Stack**: Next.js 16.2.6 + Cloudflare Pages + D1 (SQLite) + R2 + Tailwind CSS
 
 ## Architecture Decisions
 
@@ -55,6 +55,8 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 19. **Shipping Resiliency**: Auto-recovery of recent labels and post-charge success guarantee.
 20. **Security Compliance**: OWASP Top 10 verified; core dependencies (Next.js, Auth.js) updated to latest secure versions.
 21. **Single-Item Delete Fix**: Fixed bug where deleting one item from a multi-item batch deleted the entire batch. Resolved `FOREIGN KEY constraint failed` error via `PRAGMA foreign_keys` toggle. Dashboard now has per-item "Remove Item" button (hover-reveal, ADMIN/MANAGER) and improved batch delete UX with item count and explicit confirm dialog.
+22. **Comprehensive Axiom Logging**: Structured logging across all API routes — 17 operations in 9 files (login, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, user changes). Replaced `console.error` with `await log.error` for Cloudflare Edge safety. Resolved TS2304 scope errors in catch blocks.
+23. **Dependency Security**: Upgraded Next.js 16.2.4 → 16.2.6, fixing 4 high-severity CVEs (CVSS 8.7: DoS via FormData, connection pool exhaustion, auth bypass via segment-prefetch routes). `npm audit --audit-level=critical` passes.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
