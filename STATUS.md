@@ -1,5 +1,19 @@
 # Project Status - PrintFrenzy
 
+### 23. 📡 Comprehensive Axiom Logging (Live)
+- **Full API Coverage**: Added structured Axiom logging to 17 operations across 7 API route files and auth provider.
+- **Login Monitoring**: All login attempts logged (success, failure, error) with user email and trace ID.
+- **Wix Webhook Visibility**: Signature validation results, payload errors, and processed order counts logged.
+- **Admin Operations**: CRUD, clear, stats, audit, backfill, and user management all logged with user context.
+- **Order Lifecycle**: DELETE, status changes, update-notes, and update-item operations logged with before/after values.
+- **Shipping & Search**: Rate lookups, status checks, and search queries logged for usage analytics.
+- **Notifications**: Subscribe, poll, and mark-read operations logged.
+- **User Preferences**: Password changes and theme switches logged.
+- **Edge Runtime Safety**: Replaced `console.error` with `await log.error` to prevent log loss in Cloudflare Edge.
+- **TypeScript Fixes**: Resolved `TS2304` scope errors in catch blocks by safely re-parsing request bodies.
+
+---
+
 ### 22. 🗑️ Single-Item Delete Fix (Live)
 - **Batch Deletion Bug Fixed**: Deleting a single item from a multi-item order/batch no longer deletes the entire batch.
 - **FOREIGN KEY Constraint Resolved**: Fixed `D1_ERROR: FOREIGN KEY constraint failed` by wrapping delete batches in `PRAGMA foreign_keys = OFF/ON` to handle `audit_logs` FK dependency correctly.
