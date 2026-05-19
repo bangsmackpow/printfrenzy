@@ -80,7 +80,71 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       if (!senderAddress.email) senderAddress.email = "curtis@printfrenzy.dev";
       if (!senderAddress.phone) senderAddress.phone = "6415551234";
 
-      const toAddress = { name: customer_name || "Customer", street1: street, city: city, state: state, zip: zip, country: "US" };
+      // ADDRESS VALIDATION via Shippo before creating shipment
+      let validationWarnings: string[] = [];
+      let correctedAddress: { street: string, city: string, state: string, zip: string } | null = null;
+      let validatedStreet = street;
+      let validatedCity = city;
+      let validatedState = state;
+      let validatedZip = zip;
+
+      try {
+        const validateRes = await fetch('https://api.goshippo.com/addresses/', {
+          method: 'POST',
+          headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: customer_name || "Customer",
+            street1: street,
+            city: city,
+            state: state,
+            zip: zip,
+            country: "US",
+            validate: true
+          })
+        });
+
+        if (validateRes.ok) {
+          const validated = await validateRes.json() as any;
+          const testResult = validated.test || validated.validation_results;
+          
+          if (testResult) {
+            if (testResult.is_valid === false) {
+              const messages = (validated.messages || []).map((m: any) => m.text || m.source || JSON.stringify(m)).join('; ');
+              await log.warn("Address validation failed", { user: userEmail, address: { street, city, state, zip }, messages });
+              return NextResponse.json({ 
+                error: "Invalid address", 
+                details: messages || "The address could not be validated by USPS. Please check and try again." 
+              }, { status: 400 });
+            }
+
+            if (testResult.is_valid === true) {
+              if (validated.street1 && validated.street1 !== street) {
+                correctedAddress = {
+                  street: validated.street1 || street,
+                  city: validated.city || city,
+                  state: validated.state || state,
+                  zip: validated.zip || zip
+                };
+                validatedStreet = correctedAddress.street;
+                validatedCity = correctedAddress.city;
+                validatedState = correctedAddress.state;
+                validatedZip = correctedAddress.zip;
+                validationWarnings.push("Address was corrected by USPS");
+              }
+              if (validated.is_residential !== undefined) {
+                validationWarnings.push(`USPS classified as: ${validated.is_residential ? 'Residential' : 'Commercial'}`);
+              }
+            }
+          }
+        }
+      } catch (valErr) {
+        await log.warn("Address validation skipped (non-critical)", { 
+          error: valErr instanceof Error ? valErr.message : 'Unknown',
+          user: userEmail 
+        });
+      }
+
+      const toAddress = { name: customer_name || "Customer", street1: validatedStreet, city: validatedCity, state: validatedState, zip: validatedZip, country: "US" };
       const parcel = { 
         length: finalLength, 
         width: finalWidth, 
@@ -112,7 +176,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const allRates = (shipment.rates || []);
       await log.info("Shipping rates retrieved", { user: userEmail, count: allRates.length });
       
-      return NextResponse.json({ rates: allRates });
+      return NextResponse.json({ 
+        rates: allRates, 
+        validation_warnings: validationWarnings,
+        corrected_address: correctedAddress
+      });
     } catch (e: unknown) { return sanitizeError(e, { user: userEmail }); }
   }
 

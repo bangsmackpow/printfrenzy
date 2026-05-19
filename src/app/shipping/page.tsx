@@ -52,6 +52,31 @@ export default function ShippingPage() {
     height: '2'
   });
   const [showAllRates, setShowAllRates] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [correctedAddress, setCorrectedAddress] = useState<{street: string, city: string, state: string, zip: string} | null>(null);
+
+  const validateAddress = (): string[] => {
+    const errors: string[] = [];
+    const { street, city, state, zip, customer_name } = formData;
+
+    if (!customer_name.trim()) errors.push("Recipient name is required");
+    if (customer_name.trim().length < 2) errors.push("Recipient name is too short");
+
+    if (!street.trim()) errors.push("Street address is required");
+    else if (street.trim().length < 3) errors.push("Street address seems too short");
+
+    if (!city.trim()) errors.push("City is required");
+    else if (city.trim().length < 2) errors.push("City name seems too short");
+
+    if (!state.trim()) errors.push("State is required");
+    else if (!/^[A-Z]{2}$/.test(state.trim().toUpperCase())) errors.push("State must be a 2-letter code (e.g., IA)");
+
+    if (!zip.trim()) errors.push("ZIP code is required");
+    else if (!/^\d{5}(-\d{4})?$/.test(zip.trim())) errors.push("ZIP must be 5 digits or ZIP+4 format (e.g., 50801 or 50801-1234)");
+
+    return errors;
+  };
 
   const copyLabelUrl = async (url: string, id: string) => {
     try {
@@ -91,15 +116,35 @@ export default function ShippingPage() {
     setIsGenerating(true);
     setFormError("");
     setRates([]);
+    setValidationErrors([]);
+    setValidationWarnings([]);
+    setCorrectedAddress(null);
+
+    const errors = validateAddress();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setIsGenerating(false);
+      return;
+    }
 
     try {
         const res = await fetch('/api/shipping/rates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
+            body: JSON.stringify({
+              ...formData,
+              state: formData.state.trim().toUpperCase(),
+              zip: formData.zip.trim()
+            })
         });
         const data = await res.json();
         if (res.ok) {
+            if (data.validation_warnings && data.validation_warnings.length > 0) {
+              setValidationWarnings(data.validation_warnings);
+            }
+            if (data.corrected_address) {
+              setCorrectedAddress(data.corrected_address);
+            }
             const sorted = (data.rates || []).sort((a: Rate, b: Rate) => parseFloat(a.amount) - parseFloat(b.amount));
             setRates(sorted);
             const gaRate = sorted.find((r: Rate) => 
@@ -125,11 +170,15 @@ export default function ShippingPage() {
     setIsGenerating(true);
     setFormError("");
 
+    const purchaseData = correctedAddress
+      ? { ...formData, street: correctedAddress.street, city: correctedAddress.city, state: correctedAddress.state, zip: correctedAddress.zip, rate_id: selectedRateId }
+      : { ...formData, rate_id: selectedRateId };
+
     try {
         const res = await fetch('/api/shipping/purchase', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...formData, rate_id: selectedRateId })
+            body: JSON.stringify(purchaseData)
         });
         const data = await res.json();
         if (res.ok) {
@@ -232,11 +281,11 @@ export default function ShippingPage() {
                       </div>
                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">State (ST)</label>
-                          <input type="text" required maxLength={2} value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center uppercase" placeholder="IA" />
+                          <input type="text" required maxLength={2} value={formData.state} onChange={e => setFormData({...formData, state: e.target.value.toUpperCase().replace(/[^A-Z]/g, '')})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center uppercase" placeholder="IA" />
                       </div>
                       <div className="space-y-2">
                           <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">ZIP Code</label>
-                          <input type="text" required value={formData.zip} onChange={e => setFormData({...formData, zip: e.target.value})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center" placeholder="50801" />
+                          <input type="text" required pattern="^\d{5}(-\d{4})?$" value={formData.zip} onChange={e => setFormData({...formData, zip: e.target.value.replace(/[^\d-]/g, '')})} className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center" placeholder="50801" />
                       </div>
                   </div>
 
@@ -308,6 +357,43 @@ export default function ShippingPage() {
                                 ) : 'Purchase Selected Label'}
                           </button>
                       </div>
+                  )}
+
+                  {validationErrors.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 p-6 rounded-3xl space-y-2">
+                      <p className="text-red-700 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        Address Validation Errors
+                      </p>
+                      {validationErrors.map((err, i) => (
+                        <p key={i} className="text-red-600 text-xs font-bold ml-6">• {err}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {validationWarnings.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl space-y-2">
+                      <p className="text-amber-700 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Address Suggestions
+                      </p>
+                      {validationWarnings.map((warn, i) => (
+                        <p key={i} className="text-amber-700 text-xs font-bold ml-6">• {warn}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {correctedAddress && (
+                    <div className="bg-green-50 border border-green-200 p-6 rounded-3xl space-y-2">
+                      <p className="text-green-700 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Address Corrected by USPS
+                      </p>
+                      <p className="text-green-700 text-xs font-bold ml-6">
+                        {correctedAddress.street}, {correctedAddress.city}, {correctedAddress.state} {correctedAddress.zip}
+                      </p>
+                      <p className="text-green-600 text-[10px] font-bold ml-6">This corrected address will be used for your label.</p>
+                    </div>
                   )}
 
                   {formError && <p className="text-red-500 text-[10px] font-black uppercase px-2">{formError}</p>}
