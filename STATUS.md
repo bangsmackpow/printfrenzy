@@ -1,5 +1,16 @@
 # Project Status - PrintFrenzy
 
+### 24. 🏠 USPS Address Validation (Live)
+- **Client-Side Format Checks**: ZIP code format validation (5 digits or ZIP+4), state must be 2-letter code, minimum length checks on name/street/city.
+- **Input Sanitization**: State field auto-uppercases and blocks non-alpha characters. ZIP field blocks non-digit/dash input.
+- **Shippo Address Validation API**: Every address is validated against USPS via Shippo before rate fetching.
+- **Auto-Correction**: When USPS provides a corrected address, it's displayed in a green confirmation panel and auto-used for label purchase.
+- **Validation Warnings**: Amber panel shows USPS metadata (e.g., "Residential" vs "Commercial" classification).
+- **Rejection of Invalid Addresses**: Orders with unresolvable addresses are rejected before any Shippo API charges occur.
+- **Axiom Logging**: Validation failures logged with full address context for debugging.
+
+---
+
 ### 23. 📡 Comprehensive Axiom Logging (Live)
 - **Full API Coverage**: Added structured Axiom logging to 17 operations across 7 API route files and auth provider.
 - **Login Monitoring**: All login attempts logged (success, failure, error) with user email and trace ID.

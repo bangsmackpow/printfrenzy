@@ -69,6 +69,7 @@ Protecting the production data and team access:
 - **Apple HEIC Support**: Support for `.heic` and `.heif` image uploads from mobile devices.
 - **Trace ID & Diagnostic UI**: Unique support codes for all errors with one-click diagnostic data export for staff.
 - **Shipping Resiliency**: Duplicate charge prevention and post-purchase database auto-recovery.
+- **USPS Address Validation**: Client-side format checks + Shippo Address Validation API. Auto-corrects addresses, rejects invalid ones before charges, shows USPS classification (residential/commercial).
 - **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (PNG, JPEG, WEBP, GIF, PDF, HEIC, HEIF, AVIF, SVG, BMP, TIFF) and magic-byte validation.
 - **Comprehensive Axiom Logging**: 17 operations across all API routes logged — login attempts, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, and user changes. Edge-safe with `await log.error` replacing `console.error`.
 

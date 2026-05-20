@@ -18,8 +18,9 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 ## Security Requirements
 
 - Sanitize all API error responses (use `sanitizeError()`)
-- Validate all inputs: email format, password strength, MIME types, file sizes, URL formats, enum status values
+- Validate all inputs: email format, password strength, MIME types, file sizes, URL formats, enum status values, address formats
 - R2 uploads: **20MB limit**, MIME whitelist (including **PDF**), magic-byte verification, UUID-based storage keys
+- Shipping: Address validation via Shippo API before rate fetching — rejects invalid addresses, auto-corrects when USPS provides fixes
 - Bulk status cap: 500 orders max per operation
 - CSV limits: 5MB / 10k records max
 - CI: `npm audit --audit-level=critical` (dev deps cause false positives at `--audit-level=high`)
@@ -57,6 +58,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 21. **Single-Item Delete Fix**: Fixed bug where deleting one item from a multi-item batch deleted the entire batch. Resolved `FOREIGN KEY constraint failed` error via `PRAGMA foreign_keys` toggle. Dashboard now has per-item "Remove Item" button (hover-reveal, ADMIN/MANAGER) and improved batch delete UX with item count and explicit confirm dialog.
 22. **Comprehensive Axiom Logging**: Structured logging across all API routes — 17 operations in 9 files (login, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, user changes). Replaced `console.error` with `await log.error` for Cloudflare Edge safety. Resolved TS2304 scope errors in catch blocks.
 23. **Dependency Security**: Upgraded Next.js 16.2.4 → 16.2.6, fixing 4 high-severity CVEs (CVSS 8.7: DoS via FormData, connection pool exhaustion, auth bypass via segment-prefetch routes). `npm audit --audit-level=critical` passes.
+24. **USPS Address Validation**: Client-side format checks (ZIP, state, required fields) + Shippo Address Validation API before rate fetching. Auto-corrects addresses, rejects invalid ones before charges, displays USPS classification (residential/commercial). Color-coded UI feedback (red errors, amber warnings, green corrected address).
 
 ### Pending / Future
 - Email notifications for critical stage transitions
