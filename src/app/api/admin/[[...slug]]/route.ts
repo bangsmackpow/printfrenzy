@@ -143,6 +143,56 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  if (slug?.[0] === 'users' && slug?.[1] === 'password') {
+    try {
+        const { id, password } = await req.json();
+        if (!password || password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
+        const hashedPassword = await hashPassword(password);
+        await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(hashedPassword, id).run();
+        log.info("admin_user_password_reset", {
+          traceId: generateTraceId(),
+          userEmail: session.user?.email,
+          role,
+          targetUserId: id,
+        });
+        return NextResponse.json({ success: true });
+    } catch (e: unknown) {
+      const { id } = await req.json().catch(() => ({}));
+      log.error("admin_user_password_reset_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        targetUserId: id,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
+  }
+
+  if (slug?.[0] === 'users' && slug?.[1] === 'email') {
+    try {
+        const { id, email } = await req.json();
+        if (!email || !EMAIL_RE.test(email)) return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+        await db.prepare("UPDATE users SET email = ? WHERE id = ?").bind(email, id).run();
+        log.info("admin_user_email_updated", {
+          traceId: generateTraceId(),
+          userEmail: session.user?.email,
+          role,
+          targetUserId: id,
+          newEmail: email,
+        });
+        return NextResponse.json({ success: true });
+    } catch (e: unknown) {
+      const { id } = await req.json().catch(() => ({}));
+      log.error("admin_user_email_update_failed", {
+        traceId: generateTraceId(),
+        userEmail: session.user?.email,
+        targetUserId: id,
+        error: e instanceof Error ? e.message : 'Unknown',
+      });
+      return sanitizeError(e);
+    }
+  }
+
   if (slug?.[0] === 'users') {
     try {
       const { email, password, role: newRole } = await req.json();
@@ -223,56 +273,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       log.error("admin_clear_failed", {
         traceId: generateTraceId(),
         userEmail: session.user?.email,
-        error: e instanceof Error ? e.message : 'Unknown',
-      });
-      return sanitizeError(e);
-    }
-  }
-
-  if (slug?.[0] === 'users' && slug?.[1] === 'password') {
-    try {
-        const { id, password } = await req.json();
-        if (!password || password.length < 8) return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
-        const hashedPassword = await hashPassword(password);
-        await db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").bind(hashedPassword, id).run();
-        log.info("admin_user_password_reset", {
-          traceId: generateTraceId(),
-          userEmail: session.user?.email,
-          role,
-          targetUserId: id,
-        });
-        return NextResponse.json({ success: true });
-    } catch (e: unknown) {
-      const { id } = await req.json().catch(() => ({}));
-      log.error("admin_user_password_reset_failed", {
-        traceId: generateTraceId(),
-        userEmail: session.user?.email,
-        targetUserId: id,
-        error: e instanceof Error ? e.message : 'Unknown',
-      });
-      return sanitizeError(e);
-    }
-  }
-
-  if (slug?.[0] === 'users' && slug?.[1] === 'email') {
-    try {
-        const { id, email } = await req.json();
-        if (!email || !EMAIL_RE.test(email)) return NextResponse.json({ error: "Invalid email" }, { status: 400 });
-        await db.prepare("UPDATE users SET email = ? WHERE id = ?").bind(email, id).run();
-        log.info("admin_user_email_updated", {
-          traceId: generateTraceId(),
-          userEmail: session.user?.email,
-          role,
-          targetUserId: id,
-          newEmail: email,
-        });
-        return NextResponse.json({ success: true });
-    } catch (e: unknown) {
-      const { id } = await req.json().catch(() => ({}));
-      log.error("admin_user_email_update_failed", {
-        traceId: generateTraceId(),
-        userEmail: session.user?.email,
-        targetUserId: id,
         error: e instanceof Error ? e.message : 'Unknown',
       });
       return sanitizeError(e);
