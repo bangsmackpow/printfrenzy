@@ -8,7 +8,7 @@
 
 const crypto = require('crypto');
 
-const ITERATIONS = 600000;
+const ITERATIONS = 100000;
 const SALT_LEN = 16;
 const KEY_LEN = 32;
 
