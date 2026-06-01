@@ -26,7 +26,7 @@ The goal of this application is to minimize the "clicks-to-print" ratio:
 
 ### 🔐 Security & Management
 Protecting the production data and team access:
-- **Unified Security Standards**: PBKDF2 with 600k iterations synchronized across production and administrative scripts.
+- **Unified Security Standards**: PBKDF2 with 100k iterations synchronized across production and administrative scripts.
 - **Password Management**: Self-service user resets and admin-initiated password resets for all staff.
 - **Destructive Safety**: "Clear All Orders" requires an Admin password re-prompt to confirm the system wipe.
 - **Individual Cleanup**: Admins can delete specific orders or entire Wix groups directly from the queue.
@@ -62,7 +62,7 @@ Protecting the production data and team access:
 - **Staging Workflow**: Added a mandatory "STAGING" step between production and shipping to ensure physical inventory matches digital batches.
 - **Personalization Upgrade**: "Personalization / Prints Name" upgraded to a multi-line textarea in all views.
 - **Automated Security**: Gitleaks, Semgrep, and Trivy run on every push to detect secrets, logic flaws, and dependency vulnerabilities.
-- **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 600k iterations, constant-time API key comparison, CSV import limits, backup hardening.
+- **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 100k iterations, constant-time API key comparison, CSV import limits, backup hardening.
 - **Copy Label URL**: One-click clipboard copy for shipping label URLs on both the Shipping Tool and Order Details pages.
 - **Shipping Audit Trail**: Every label purchase logged in audit log with tracking number, destination, and user email.
 - **RGC Vinyl Pricing Engine**: Pro-grade square-inch based calculator with mode-based presets (Simple, Layered, Printed), setup fees, shop minimums, and a professional **Print-to-PDF Quote** generator.

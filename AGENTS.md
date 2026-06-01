@@ -10,7 +10,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 
 - **Real-time**: 5-second polling against D1 (Cloudflare Edge doesn't support WebSockets/long-lived connections)
 - **Database**: Cloudflare D1 (serverless SQLite) — sufficient for this scale, no external streaming DB needed
-- **Auth**: PBKDF2 with 600k iterations, constant-time API key comparison
+- **Auth**: PBKDF2 with 100k iterations, constant-time API key comparison
 - **Error Handling**: `sanitizeError()` helper on all API routes — logs real errors to **Axiom**, returns `"Internal server error"` to clients (never leak D1/schema internals)
 - **SQL**: Parameterized queries exclusively — no string interpolation
 - **Observability**: High-signal event streaming to Axiom via `src/utils/logger.ts`.
@@ -40,7 +40,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 2. **Stage Subscriptions & Notifications**: `notification_subscriptions` & `notifications` tables. Bell icon in dashboard header. 5s polling via `/api/notifications/poll`. Toast popups show who moved which order to which stage. Self-filtering (no notifications for own moves).
 3. **Order Sheets v3**: Per-batch selection grid with item counts. Select All / Clear All. Prints one item per page as packing slip with QC sign-off checkboxes (Art OK / Printed / Applied).
 4. **Universal Search**: Sidebar search bar under logo. Searches `order_number`, `customer_name`, `product_name`, `variant`, `notes`, `print_name`, `status`. `⌘K` shortcut. 250ms debounce. Dropdown with status badges.
-5. **Security Hardening**: Error sanitization, R2 upload validation (20MB, magic-byte), env var for R2 public URL, constant-time API key comparison, input validation, bulk status cap, CSV limits, removed login console.log, PBKDF2 → 600k iterations (synchronized across production and scripts).
+5. **Security Hardening**: Error sanitization, R2 upload validation (20MB, magic-byte), env var for R2 public URL, constant-time API key comparison, input validation, bulk status cap, CSV limits, removed login console.log, PBKDF2 → 100k iterations (synchronized across production and scripts).
 6. **Multi-Image & UI Upgrades**: Manual orders accept up to 4 images (`image_url`–`image_url4`). Queue and print views display 2x2 quadrant grid. `ImageLightbox` for full-screen viewing. **Personalization / Prints Name** upgraded to multi-line textarea. **Edit Order** page upgraded to support all 4 images, notes, and personalization.
 7. **Documentation**: `README.md` and `STATUS.md` updated with all features, security improvements, and schema changes.
 8. **Copy Label URL to Clipboard**: Clipboard button next to "Print Label" on shipping page and order details. One-click copy with visual confirmation ("Copied!" for 1.5s).
@@ -97,7 +97,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `src/components/ImageLightbox.tsx` — multi-image modal with keyboard nav
 
 ### Utilities
-- `src/utils/hashUtils.ts` — PBKDF2 600k iterations
+- `src/utils/hashUtils.ts` — PBKDF2 100k iterations
 - `src/utils/logger.ts` — Axiom integration utility
 - `src/utils/trace.ts` — Trace ID generation
 - `src/utils/backupUtils.ts` — excludes password_hash

@@ -82,7 +82,7 @@
 ## 🚀 Recent Major Updates (April 20, 2026 — Session 3)
 
 ### 11. 🛡️ Security Synchronization (Live)
-- **Unified Hashing Standards**: Synchronized PBKDF2 iterations to **600,000** across the production app and all helper scripts (`create-admin.js`, `seed-admin.mjs`).
+- **Unified Hashing Standards**: Synchronized PBKDF2 iterations to **100,000** across the production app and all helper scripts (`create-admin.js`, `seed-admin.mjs`).
 - **Standardized Format**: Ensured scripts generate the exact `iterations.salt.hash` format required by the production `hashUtils.ts`.
 - **Bcrypt Removal**: Fully removed legacy bcrypt references from seeding scripts to prevent login failures.
 
@@ -173,7 +173,7 @@
 - **Input Validation**: Email format, password min 8 chars, role whitelist, URL validation, positive quantity enforcement.
 - **Bulk Status Limits**: Max 500 items per bulk operation, status enum validation.
 - **CSV Import Limits**: 5MB max file size, 10,000 record cap.
-- **PBKDF2 Hardened**: Increased from 100k to 600k iterations (OWASP recommended).
+- **PBKDF2 Hardened**: Set to 100k iterations (Cloudflare Workers Web Crypto API limit).
 - **Constant-Time API Key Comparison**: Timing-safe comparison for import API key.
 - **Backup Hardening**: `password_hash` excluded from full database backups.
 - **CI Fixed**: `npm audit --audit-level=critical` to stop false-positive dev dependency failures.
