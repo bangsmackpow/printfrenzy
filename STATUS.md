@@ -1,5 +1,13 @@
 # Project Status - PrintFrenzy
 
+### 25. 🔧 Database Robustness and Deletion Foreign Key Bug Fixes (Live)
+- **Delete Dependency Resolution**: Resolved `D1_ERROR: FOREIGN KEY constraint failed` when deleting items/batches by re-ordering the transaction batch execution, deleting matching entries from the dependent table `audit_logs` prior to the main `orders` deletion.
+- **Audit Logging Null Binding Safety**: Bound `null` to `order_id` in subsequent audit log insertions after an order is completely removed. This fully prevents orphaned reference errors in SQLite, avoiding the need for unreliable, connection-scoped `PRAGMA foreign_keys` toggle controls.
+- **CSV Ingest Parameter Safeguard**: Patched a D1 type mismatch error (`D1_TYPE_ERROR: Type 'undefined' not supported`) during CSV imports by explicitly defaulting optional fields (such as missing `"Date"` or `"ordered_at"` headers) to `null` instead of letting them evaluate to `undefined`.
+- **Shipping Endpoint Sanitization**: Pre-sanitized all destructured shipping/address parameters (such as `customer_name`, `street`, `city`, `state`, and `zip`) to guarantee no `undefined` keys are passed to database query bindings when labels are purchased.
+
+---
+
 ### 24. 🏠 USPS Address Validation (Live)
 - **Client-Side Format Checks**: ZIP code format validation (5 digits or ZIP+4), state must be 2-letter code, minimum length checks on name/street/city.
 - **Input Sanitization**: State field auto-uppercases and blocks non-alpha characters. ZIP field blocks non-digit/dash input.

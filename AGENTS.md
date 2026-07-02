@@ -59,6 +59,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 22. **Comprehensive Axiom Logging**: Structured logging across all API routes — 17 operations in 9 files (login, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, user changes). Replaced `console.error` with `await log.error` for Cloudflare Edge safety. Resolved TS2304 scope errors in catch blocks.
 23. **Dependency Security**: Upgraded Next.js 16.2.4 → 16.2.6, fixing 4 high-severity CVEs (CVSS 8.7: DoS via FormData, connection pool exhaustion, auth bypass via segment-prefetch routes). `npm audit --audit-level=critical` passes.
 24. **USPS Address Validation**: Client-side format checks (ZIP, state, required fields) + Shippo Address Validation API before rate fetching. Auto-corrects addresses, rejects invalid ones before charges, displays USPS classification (residential/commercial). Color-coded UI feedback (red errors, amber warnings, green corrected address).
+25. **Database Robustness and Deletion Fixes**: Re-ordered deletion transactions in `db.batch()` to purge `audit_logs` before parent `orders`. Bound `null` instead of non-existent order IDs in deletion logs to satisfy the SQLite foreign key constraint. Defaulted all CSV parsing and shipping destructuring results to fallback null/string values to prevent `undefined` binding crashes (`D1_TYPE_ERROR`) in Cloudflare D1.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
