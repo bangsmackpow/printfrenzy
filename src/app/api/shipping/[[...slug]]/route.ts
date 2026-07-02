@@ -192,11 +192,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       const body = await req.json();
       const { rate_id, order_number, customer_name, street, city, state, zip } = body;
       const finalOrderNumber = order_number || 'MANUAL';
+      const finalCustomerName = customer_name || 'UNKNOWN';
+      const finalStreet = street || '';
+      const finalCity = city || '';
+      const finalState = state || '';
+      const finalZip = zip || '';
 
       // PREVENT DUPLICATES: Check if a label was just created for this order in the last 2 minutes
       try {
         const recentLabel = await db.prepare("SELECT tracking_number, label_url FROM shipments WHERE order_number = ? AND customer_name = ? AND created_at > datetime('now', '-2 minutes') ORDER BY created_at DESC LIMIT 1")
-          .bind(finalOrderNumber, customer_name).first() as { tracking_number: string, label_url: string } | null;
+          .bind(finalOrderNumber, finalCustomerName).first() as { tracking_number: string, label_url: string } | null;
         
         if (recentLabel) {
           await log.info("Recovered recently created label to prevent duplicate charge", { user: userEmail, order: finalOrderNumber, tracking: recentLabel.tracking_number });
@@ -225,13 +230,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       try {
         const shipmentId = crypto.randomUUID();
         await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(shipmentId, finalOrderNumber, customer_name, street, city, state, zip, transaction.tracking_number, transaction.label_url).run();
+          .bind(shipmentId, finalOrderNumber, finalCustomerName, finalStreet, finalCity, finalState, finalZip, transaction.tracking_number, transaction.label_url).run();
 
         // FIX: Removed hardcoded values from bind that were already in the SQL string
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'SHIPMENT_CREATED', 'Shipping label purchased', ?)")
           .bind(null, finalOrderNumber, userEmail, JSON.stringify({
             tracking_number: transaction.tracking_number,
-            destination: `${customer_name}, ${street}, ${city}, ${state} ${zip}`,
+            destination: `${finalCustomerName}, ${finalStreet}, ${finalCity}, ${finalState} ${finalZip}`,
             label_url: transaction.label_url
           })).run();
           

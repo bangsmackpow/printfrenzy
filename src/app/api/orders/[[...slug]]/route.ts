@@ -151,12 +151,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
         let count = 0;
         for (const record of records) {
-            const wixOrderNum = record['Order number'] || record['Order ID'] || record['order_number'];
+            const wixOrderNum = record['Order number'] || record['Order ID'] || record['order_number'] || null;
             const customerName = record['Customer name'] || record['Billing Name'] || record['customer_name'] || 'Unknown';
             const productName = record['Product name'] || record['Lineitem name'] || record['product_name'] || 'Product';
             const variant = (record['Product variant'] || record['Lineitem options'] || record['variant'] || '').trim();
-            const imageUrl = record['Product image'] || record['Lineitem image URL'] || record['image_url'];
-            const orderedAt = record['Date'] || record['ordered_at'];
+            const imageUrl = record['Product image'] || record['Lineitem image URL'] || record['image_url'] || null;
+            const orderedAt = record['Date'] || record['ordered_at'] || null;
             const qty = parseInt(record['Quantity'] || '1', 10) || 1;
 
             if (imageUrl) {
@@ -457,12 +457,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
         const existing = await db.prepare("SELECT order_number FROM orders WHERE id = ?").bind(id).first() as { order_number: string } | null;
         await db.prepare("PRAGMA foreign_keys = OFF").run();
         await db.batch([
-          db.prepare("DELETE FROM orders WHERE id = ?").bind(id),
           db.prepare("DELETE FROM audit_logs WHERE order_id = ?").bind(id),
+          db.prepare("DELETE FROM orders WHERE id = ?").bind(id),
         ]);
         await db.prepare("PRAGMA foreign_keys = ON").run();
         await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
-          .bind(id, existing?.order_number || id, session?.user?.email || "SYSTEM", JSON.stringify({ order_number: existing?.order_number })).run();
+          .bind(null, existing?.order_number || id, session?.user?.email || "SYSTEM", JSON.stringify({ order_number: existing?.order_number })).run();
         await log.info("order_deleted", {
           traceId: generateTraceId(),
           userEmail: session?.user?.email,
@@ -474,15 +474,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
         const ordersToDelete = await db.prepare("SELECT id, order_number FROM orders WHERE order_number = ?").bind(orderNumber).all();
         await db.prepare("PRAGMA foreign_keys = OFF").run();
         await db.batch([
-          db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber),
           db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber),
           db.prepare("DELETE FROM shipments WHERE order_number = ?").bind(orderNumber),
+          db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber),
         ]);
         await db.prepare("PRAGMA foreign_keys = ON").run();
         const userEmail = session?.user?.email || "SYSTEM";
         for (const order of (ordersToDelete.results as { id: string; order_number: string }[])) {
           await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'ORDER_DELETE', 'Order deleted', ?)")
-            .bind(order.id, order.order_number, userEmail, JSON.stringify({ order_number: order.order_number })).run();
+            .bind(null, order.order_number, userEmail, JSON.stringify({ order_number: order.order_number })).run();
         }
         await log.info("orders_deleted_by_number", {
           traceId: generateTraceId(),
