@@ -20,29 +20,60 @@ function constantTimeCompare(a: string, b: string): boolean {
 }
 
 function parseCSV(text: string) {
-  const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+  const lines: string[] = [];
+  
+  // Accurately split lines by newline, ignoring newlines inside quotes
+  let currentLine = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      currentLine += char;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && text[i + 1] === '\n') {
+        i++; // skip the \n
+      }
+      if (currentLine.trim() !== "") {
+        lines.push(currentLine);
+      }
+      currentLine = "";
+    } else {
+      currentLine += char;
+    }
+  }
+  if (currentLine.trim() !== "") {
+    lines.push(currentLine);
+  }
+
   if (lines.length === 0) return [];
   
   const parseLine = (line: string) => {
-    const result = [];
+    const result: string[] = [];
     let cur = "";
     let inQuotes = false;
     for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-            result.push(cur.trim().replace(/^"|"$/g, ''));
-            cur = "";
+      const char = line[i];
+      if (char === '"') {
+        // Handle escaped quotes: "" inside a quoted field
+        if (inQuotes && line[i + 1] === '"') {
+          cur += '"';
+          i++; // skip next quote
         } else {
-            cur += char;
+          inQuotes = !inQuotes;
         }
+      } else if (char === ',' && !inQuotes) {
+        result.push(cur.trim());
+        cur = "";
+      } else {
+        cur += char;
+      }
     }
-    result.push(cur.trim().replace(/^"|"$/g, ''));
+    result.push(cur.trim());
     return result;
   };
 
-  const headers = parseLine(lines[0]);
+  const headers = parseLine(lines[0]).map(h => h.trim().toLowerCase());
   return lines.slice(1).map(line => {
     const values = parseLine(line);
     const record: Record<string, string> = {};
@@ -150,24 +181,60 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         }
 
         let count = 0;
+        let skipped = 0;
         for (const record of records) {
-            const wixOrderNum = record['Order number'] || record['Order ID'] || record['order_number'] || null;
-            const customerName = record['Customer name'] || record['Billing Name'] || record['customer_name'] || 'Unknown';
-            const productName = record['Product name'] || record['Lineitem name'] || record['product_name'] || 'Product';
-            const variant = (record['Product variant'] || record['Lineitem options'] || record['variant'] || '').trim();
-            const imageUrl = record['Product image'] || record['Lineitem image URL'] || record['image_url'] || null;
-            const orderedAt = record['Date'] || record['ordered_at'] || null;
-            const qty = parseInt(record['Quantity'] || '1', 10) || 1;
+            const wixOrderNum = record['order number'] || record['order id'] || record['order_number'] || null;
+            const customerName = record['customer name'] || record['billing name'] || record['customer_name'] || 'Unknown';
+            const productName = record['product name'] || record['lineitem name'] || record['product_name'] || 'Product';
+            const variant = (record['product variant'] || record['lineitem options'] || record['variant'] || '').trim();
+            let imageUrl = record['product image'] || record['lineitem image url'] || record['image_url'] || null;
+            const orderedAt = record['date'] || record['ordered_at'] || null;
+            const qty = parseInt(record['quantity'] || '1', 10) || 1;
+
+            if (!imageUrl) {
+                // Fallback: search all columns for any image or Wix image URL
+                for (const key of Object.keys(record)) {
+                    const val = record[key];
+                    if (typeof val === 'string' && val) {
+                        // Find matches for HTTP/HTTPS or wix:image:// URLs
+                        const matches = val.match(/(https?:\/\/[^\s,"]+|wix:image:\/\/[^\s,"]+)/gi);
+                        if (matches) {
+                            for (const url of matches) {
+                                const lowercaseUrl = url.toLowerCase();
+                                const hasImageExt = /\.(jpg|jpeg|png|gif|webp|heic|heif|avif|svg|bmp|tiff)(?:[?#]|$)/.test(lowercaseUrl);
+                                const isWixUrl = lowercaseUrl.includes('wixstatic.com') || lowercaseUrl.startsWith('wix:image://');
+                                if (hasImageExt || isWixUrl) {
+                                    imageUrl = url;
+                                    break;
+                                }
+                            }
+                        }
+                        if (imageUrl) break;
+                    }
+                }
+            }
+
+            let cleanedVariant = variant;
+            if (imageUrl) {
+                // If the imageUrl is part of the variant string, remove it to keep the variant text clean in the UI.
+                cleanedVariant = cleanedVariant.replace(imageUrl, '').trim();
+                // Remove trailing labels like "Upload design: ", "Upload Artwork: ", "Design: ", etc., if they are now empty
+                cleanedVariant = cleanedVariant.replace(/(?:Upload\s+)?(?:design|artwork|file|image|photo)s?(?:\s*file)?\s*:\s*(?=[,;]|$)/gi, '');
+                // Clean up trailing/leading commas, semicolons, and spaces
+                cleanedVariant = cleanedVariant.replace(/^[,;\s]+|[,;\s]+$/g, '').replace(/,\s*,/g, ',').replace(/;\s*;/g, ';').trim();
+            }
 
             if (imageUrl) {
                 await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
-                    .bind(crypto.randomUUID(), batchName || wixOrderNum || "IMPORT", customerName, productName, variant, imageUrl, orderedAt, qty).run();
+                    .bind(crypto.randomUUID(), batchName || wixOrderNum || "IMPORT", customerName, productName, cleanedVariant, imageUrl, orderedAt, qty).run();
                 count++;
+            } else {
+                skipped++;
             }
         }
         
-        await log.info("CSV Import successful", { user: userEmail, imported: count, total: records.length });
-        return NextResponse.json({ count });
+        await log.info("CSV Import successful", { user: userEmail, imported: count, total: records.length, skipped });
+        return NextResponse.json({ count, skipped });
     } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
   }
 
