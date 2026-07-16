@@ -72,3 +72,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     read INTEGER DEFAULT 0,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS rate_limits (
+    ip TEXT,
+    endpoint TEXT,
+    timestamp INTEGER,
+    PRIMARY KEY (ip, endpoint, timestamp)
+);

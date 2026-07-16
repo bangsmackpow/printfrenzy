@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { log } from "@/utils/logger";
 import { generateTraceId } from "@/utils/trace";
+import { isRateLimited } from "@/utils/rateLimiter";
 
 export const runtime = 'edge';
 
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   if (slug?.[0] === 'rates') {
+    if (db) {
+      const limited = await isRateLimited(db, req, "fetch_rates", 10, 60); // 10 rate fetches per 60s
+      if (limited) {
+        return NextResponse.json({ error: "Too many rate requests. Please wait a minute." }, { status: 429 });
+      }
+    }
     const SHIPPO_API_KEY = process.env.SHIPPO_API_KEY;
     if (!SHIPPO_API_KEY) {
       await log.error("Shippo API Key missing", { user: userEmail });
@@ -185,6 +192,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   }
 
   if (slug?.[0] === 'purchase') {
+    if (db) {
+      const limited = await isRateLimited(db, req, "purchase_label", 5, 60); // 5 label purchases per 60s
+      if (limited) {
+        return NextResponse.json({ error: "Too many label purchase attempts. Please wait a minute." }, { status: 429 });
+      }
+    }
     const SHIPPO_API_KEY = process.env.SHIPPO_API_KEY;
     if (!SHIPPO_API_KEY) return NextResponse.json({ error: "Configuration error" }, { status: 500 });
 

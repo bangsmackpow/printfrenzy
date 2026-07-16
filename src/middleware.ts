@@ -1,16 +1,32 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isRateLimited } from "@/utils/rateLimiter";
 
 export const runtime = "experimental-edge";
 
 export default async function proxy(request: NextRequest) {
-  const session = await auth();
   const isLoginPage = request.nextUrl.pathname === "/login";
+  const isCredentialsLogin = request.nextUrl.pathname === "/api/auth/callback/credentials" && request.method === "POST";
 
-  // Only protect the dashboard and order pages
-  // API and Static files are excluded by the matcher
-  if (!session && !isLoginPage) {
+  // Rate limit credentials login
+  if (isCredentialsLogin) {
+    const db = (process.env as unknown as { DB: D1Database }).DB;
+    if (db) {
+      const limited = await isRateLimited(db, request, "login", 5, 60); // 5 attempts per 60s
+      if (limited) {
+        return new NextResponse(JSON.stringify({ error: "Too many login attempts. Please try again in a minute." }), {
+          status: 429,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+  }
+
+  const session = await auth();
+
+  // Redirect to login if unauthenticated (and not accessing login page/login action)
+  if (!session && !isLoginPage && !isCredentialsLogin) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -27,15 +43,12 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match only the pages that need authentication.
-     * This avoids loading the Auth stack for EVERY single API request or asset.
-     */
     '/',
     '/dashboard',
     '/orders/:path*',
     '/admin/:path*',
     '/import',
-    '/settings'
+    '/settings',
+    '/api/auth/callback/credentials'
   ],
 };

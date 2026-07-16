@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { log } from "@/utils/logger";
-
 import { generateTraceId } from "@/utils/trace";
+import { isRateLimited } from "@/utils/rateLimiter";
 
 export const runtime = 'edge';
 
@@ -61,6 +61,14 @@ function validateMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = (process.env as unknown as { DB: D1Database }).DB;
+  if (db) {
+    const limited = await isRateLimited(db, req, "upload", 10, 60); // 10 uploads per 60s
+    if (limited) {
+      return NextResponse.json({ error: "Too many upload requests. Please wait a minute." }, { status: 429 });
+    }
+  }
 
   const userEmail = session.user?.email || "unknown";
 
