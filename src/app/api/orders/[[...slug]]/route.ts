@@ -187,7 +187,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
             const customerName = record['customer name'] || record['billing name'] || record['customer_name'] || 'Unknown';
             const productName = record['product name'] || record['lineitem name'] || record['product_name'] || 'Product';
             const variant = (record['product variant'] || record['lineitem options'] || record['variant'] || '').trim();
-            let imageUrl = record['product image'] || record['lineitem image url'] || record['image_url'] || null;
+            let imageUrl = record['product image url'] || record['product image'] || record['lineitem image url'] || record['image_url'] || null;
             const orderedAt = record['date'] || record['ordered_at'] || null;
             const qty = parseInt(record['quantity'] || '1', 10) || 1;
 
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
                     const val = record[key];
                     if (typeof val === 'string' && val) {
                         // Find matches for HTTP/HTTPS or wix:image:// URLs
-                        const matches = val.match(/(https?:\/\/[^\s,"]+|wix:image:\/\/[^\s,"]+)/gi);
+                        const matches = val.match(/(https?:\/\/[^\s"]+|wix:image:\/\/[^\s"]+)/gi);
                         if (matches) {
                             for (const url of matches) {
                                 const lowercaseUrl = url.toLowerCase();

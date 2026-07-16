@@ -1,5 +1,11 @@
 # Project Status - PrintFrenzy
 
+### 26. 🖼️ CSV Image Import and Wix URL Parsing Fixes (Live)
+- **Direct Header Matching**: Added direct support for the `"Product image URL"` (lowercased to `product image url`) column key during CSV import, bypassing the fallback URL extractor when the column is explicitly present.
+- **Wix URL Resizing Regex Fix**: Removed the comma constraint from the fallback URL matching regex (`[^\s,"]+` -> `[^\s"]+`). This ensures that complex resized Wix media URLs containing commas (e.g. `w_50,h_50`) are parsed fully without truncation, preventing broken/forbidden image displays.
+
+---
+
 ### 25. 🔧 Database Robustness and Deletion Foreign Key Bug Fixes (Live)
 - **Delete Dependency Resolution**: Resolved `D1_ERROR: FOREIGN KEY constraint failed` when deleting items/batches by re-ordering the transaction batch execution, deleting matching entries from the dependent table `audit_logs` prior to the main `orders` deletion.
 - **Audit Logging Null Binding Safety**: Bound `null` to `order_id` in subsequent audit log insertions after an order is completely removed. This fully prevents orphaned reference errors in SQLite, avoiding the need for unreliable, connection-scoped `PRAGMA foreign_keys` toggle controls.
