@@ -13,6 +13,14 @@ export default async function proxy(request: NextRequest) {
   if (!session && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+
+  // Protect admin routes from non-admin/non-manager roles
+  if (session && request.nextUrl.pathname.startsWith("/admin")) {
+    const role = (session.user as { role?: string })?.role;
+    if (role !== "ADMIN" && role !== "MANAGER") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
   
   return NextResponse.next();
 }

@@ -1,5 +1,12 @@
 # Project Status - PrintFrenzy
 
+### 27. 🛡️ Privilege Escalation and Security Hardening (Live)
+- **Role Segregation**: Restrained all user management APIs (CRUD operations, password resets, and email changes) and database-clearing operations (`/api/admin/clear`) to the `ADMIN` role. This prevents `MANAGER` accounts from escalating privileges, managing other admins, or performing full database purges.
+- **Frontend Route Protection**: Added path-level role checks in `middleware.ts` to redirect unauthorized users (role `USER`) trying to access `/admin/*` routes to the dashboard page early.
+- **Local Schema Sync**: Synchronized the local database schema to include the `action_type` column in `audit_logs` to match production.
+
+---
+
 ### 26. 🖼️ CSV Image Import and Wix URL Parsing Fixes (Live)
 - **Direct Header Matching**: Added direct support for the `"Product image URL"` (lowercased to `product image url`) column key during CSV import, bypassing the fallback URL extractor when the column is explicitly present.
 - **Wix URL Resizing Regex Fix**: Removed the comma constraint from the fallback URL matching regex (`[^\s,"]+` -> `[^\s"]+`). This ensures that complex resized Wix media URLs containing commas (e.g. `w_50,h_50`) are parsed fully without truncation, preventing broken/forbidden image displays.

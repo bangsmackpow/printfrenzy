@@ -143,6 +143,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  if ((slug?.[0] === 'users' || slug?.[0] === 'clear') && role !== 'ADMIN') {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   if (slug?.[0] === 'users' && slug?.[1] === 'password') {
     try {
         const { id, password } = await req.json();
@@ -289,6 +293,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
 
   const role = (session?.user as { role?: string })?.role;
   if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (slug?.[0] === 'users' && role !== 'ADMIN') {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
