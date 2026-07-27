@@ -261,6 +261,19 @@ The live production database has been verified and matches the current codebase 
 - **Scheduled Sync Fallback**: Add cron-based sync as backup if webhooks fail.
 - **Cloudflare Rate Limiting**: Native rate limiting on login, upload, and shipping purchase endpoints.
 
+## 🧹 YAGNI Cleanup (July 26, 2026)
+A YAGNI audit identified 8 items (~560 lines) of unnecessary code. Completed:
+- **`src/utils/backupUtils.ts`**: Deleted — never imported anywhere, 79 lines dead code.
+- **`src/app/admin/reports/page.tsx`**: Deleted — fetched from non-existent API endpoints.
+- **`src/app/api/user/theme/route.ts`**: Deleted — localStorage alone suffices for theme persistence.
+- **`src/app/shipping/page.tsx`**: Deleted — duplicated the shipping block in `orders/details/page.tsx`.
+- **5 legacy scripts**: Deleted `gen-hash.js`, `gen-light-hash.js`, `test-hash.js`, `fix-password.js`, `create-admin.js`. Kept `seed-admin.mjs` as the single admin seed script.
+- **`scripts/email-worker.ts`**: Deleted — premature email infra, no dependent code exists.
+- **`ThemeContext.tsx`**: Removed backend sync call to deleted `/api/user/theme` endpoint.
+- **`Sidebar.tsx`**: Removed "Shipping Tool" nav link.
+
+See [`CLEANUP.md`](./CLEANUP.md) for full details and remaining optional items.
+
 ## 🧹 Cleanup Notes (April 1, 2026)
 - Removed temporary `image-diagnostic` admin endpoint (one-time use only).
 - Added `.wrangler/` to `.gitignore`.

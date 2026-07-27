@@ -50,7 +50,7 @@ Protecting the production data and team access:
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
 - **Command Center**: Audit log with intelligence filters and production velocity stats.
 - **Production Print Manifest**: A dedicated sidebar tab for generating global, high-resolution print manifests for all orders in the "PRINTING" stage.
-- **USPS Shipping Tool**: A standalone sidebar tool for generating and tracking USPS shipping labels for both internal orders and external shipments via Shippo API. Ensures sender contact compliance and hides postage price on labels.
+- **USPS Shipping**: Shipping label generation and tracking via Shippo API, embedded inline on the Order Details page. Ensures sender contact compliance and hides postage price on labels.
 - **Wix Direct API Sync**: Real-time synchronization of paid orders directly into the production queue without manual processing. Cursor-based pagination (50/page, max 5 pages).
 - **Wix Webhook Integration**: Real-time order ingestion via `/api/webhooks/wix` with HMAC-SHA256 signature verification. No manual sync needed.
 - **R2 Integration**: Secure browser-to-bucket uploads for manual designs. Custom R2-hosted placeholder SVG for orders without artwork.
@@ -58,12 +58,12 @@ Protecting the production data and team access:
 - **Order sheets (v3)**: Per-batch selection interface — pick which batches to print. Each item prints on its own page as a compact packing slip with product image(s), variant, personalization, and QC sign-off checkboxes.
 - **Multi-Image Support**: Manual orders support up to 4 artwork images. Displayed as 2x2 quadrants in the queue and on packing slips. Click-to-enlarge lightbox with keyboard navigation.
 - **Universal Search**: Sidebar search bar (⌘K shortcut) searches across all order fields — order number, customer, product, variant, notes, print name, and status.
-- **Multi-Theme Experience**: Native support for Light, Dark, and High-Contrast Polarized modes. Theme preferences are persistent per user and sync across all logged-in devices.
+- **Multi-Theme Experience**: Native support for Light, Dark, and High-Contrast Polarized modes. Theme preferences persist to localStorage.
 - **Staging Workflow**: Added a mandatory "STAGING" step between production and shipping to ensure physical inventory matches digital batches.
 - **Personalization Upgrade**: "Personalization / Prints Name" upgraded to a multi-line textarea in all views.
 - **Automated Security**: Gitleaks, Semgrep, and Trivy run on every push to detect secrets, logic flaws, and dependency vulnerabilities.
 - **Security Hardening**: Error sanitization, R2 upload validation (size/MIME/magic bytes), input validation, PBKDF2 100k iterations, constant-time API key comparison, CSV import limits, backup hardening.
-- **Copy Label URL**: One-click clipboard copy for shipping label URLs on both the Shipping Tool and Order Details pages.
+- **Copy Label URL**: One-click clipboard copy for shipping label URLs on the Order Details page.
 - **Shipping Audit Trail**: Every label purchase logged in audit log with tracking number, destination, and user email.
 - **RGC Vinyl Pricing Engine**: Pro-grade square-inch based calculator with mode-based presets (Simple, Layered, Printed), setup fees, shop minimums, and a professional **Print-to-PDF Quote** generator.
 - **Apple HEIC Support**: Support for `.heic` and `.heif` image uploads from mobile devices.
@@ -72,6 +72,7 @@ Protecting the production data and team access:
 - **USPS Address Validation**: Client-side format checks + Shippo Address Validation API. Auto-corrects addresses, rejects invalid ones before charges, shows USPS classification (residential/commercial).
 - **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (PNG, JPEG, WEBP, GIF, PDF, HEIC, HEIF, AVIF, SVG, BMP, TIFF) and magic-byte validation.
 - **Comprehensive Axiom Logging**: 17 operations across all API routes logged — login attempts, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, and user changes. Edge-safe with `await log.error` replacing `console.error`.
+- **YAGNI Code Cleanup**: ~560 lines of dead/redundant code removed — unused backup utilities, dead reports page, overkill theme API route, duplicate shipping page, and legacy scripts. See [`CLEANUP.md`](./CLEANUP.md).
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.

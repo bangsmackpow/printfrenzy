@@ -60,6 +60,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 23. **Dependency Security**: Upgraded Next.js 16.2.4 → 16.2.6, fixing 4 high-severity CVEs (CVSS 8.7: DoS via FormData, connection pool exhaustion, auth bypass via segment-prefetch routes). `npm audit --audit-level=critical` passes.
 24. **USPS Address Validation**: Client-side format checks (ZIP, state, required fields) + Shippo Address Validation API before rate fetching. Auto-corrects addresses, rejects invalid ones before charges, displays USPS classification (residential/commercial). Color-coded UI feedback (red errors, amber warnings, green corrected address).
 25. **Database Robustness and Deletion Fixes**: Re-ordered deletion transactions in `db.batch()` to purge `audit_logs` before parent `orders`. Bound `null` instead of non-existent order IDs in deletion logs to satisfy the SQLite foreign key constraint. Defaulted all CSV parsing and shipping destructuring results to fallback null/string values to prevent `undefined` binding crashes (`D1_TYPE_ERROR`) in Cloudflare D1.
+26. **YAGNI Cleanup**: Removed ~560 lines of dead/redundant code — `backupUtils.ts` (unused), `admin/reports/page.tsx` (non-existent API), `api/user/theme/route.ts` (localStorage suffices), `shipping/page.tsx` (duplicates order details), and 5 legacy scripts (`gen-hash.js`, `gen-light-hash.js`, `test-hash.js`, `fix-password.js`, `create-admin.js`). Kept `seed-admin.mjs` as the single admin seed script. See `CLEANUP.md`.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
@@ -101,7 +102,6 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `src/utils/hashUtils.ts` — PBKDF2 100k iterations
 - `src/utils/logger.ts` — Axiom integration utility
 - `src/utils/trace.ts` — Trace ID generation
-- `src/utils/backupUtils.ts` — excludes password_hash
 - `src/utils/wixUtils.ts` — image URL transformation
 
 ### Config & CI

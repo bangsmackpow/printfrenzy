@@ -40,22 +40,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
     
-    // Status sync to backend if logged in
-    if (session?.user?.email && session.user.theme !== theme) {
-      fetch('/api/user/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme })
-      }).catch(err => console.error("Theme sync fail", err));
-    }
-
-    // Add polarized class if needed
-    if (theme.startsWith('polarized-')) {
-        document.documentElement.classList.add('polarized');
-    } else {
-        document.documentElement.classList.remove('polarized');
-    }
-
     // Standard dark class for tailwind
     if (theme.includes('dark')) {
         document.documentElement.classList.add('dark');
