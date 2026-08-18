@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
+import { useEffect, useState, Suspense, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { useSession, signOut } from "next-auth/react";
@@ -28,6 +28,14 @@ interface Order {
 }
 
 const STAGES: OrderStatus[] = ['RECEIVED', 'ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED', 'ARCHIVED'];
+
+const REFRESH_KEY = 'pf_queue_refresh';
+const REFRESH_OPTIONS = [
+  { value: '60', label: '60s' },
+  { value: '30', label: '30s' },
+  { value: '5', label: '5s' },
+  { value: 'disabled', label: 'Off' },
+];
 
 function DashboardContent() {
   const { data: session, status: authStatus } = useSession();
@@ -76,8 +84,8 @@ function DashboardContent() {
     setFilter(notification.to_stage);
   }, []);
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
+  const fetchItems = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch('/api/orders');
       if (res.ok) {
@@ -86,7 +94,7 @@ function DashboardContent() {
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
   
@@ -117,6 +125,53 @@ function DashboardContent() {
       fetchSubscriptions();
     }
   }, [authStatus, router, fetchItems, fetchSubscriptions]);
+
+  const [refreshInterval, setRefreshInterval] = useState('60');
+  const [countdown, setCountdown] = useState<number | null>(60);
+  const lastActivityRef = useRef(Date.now());
+
+  useEffect(() => {
+    const saved = localStorage.getItem(REFRESH_KEY);
+    if (saved && REFRESH_OPTIONS.some(o => o.value === saved)) {
+      setRefreshInterval(saved);
+      setCountdown(saved === 'disabled' ? null : parseInt(saved));
+    }
+  }, []);
+
+  useEffect(() => {
+    const markActive = () => { lastActivityRef.current = Date.now(); };
+    const events: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'focus', 'scroll'];
+    events.forEach(e => window.addEventListener(e, markActive, { passive: true }));
+    return () => events.forEach(e => window.removeEventListener(e, markActive));
+  }, []);
+
+  useEffect(() => {
+    if (refreshInterval === 'disabled') {
+      setCountdown(null);
+      return;
+    }
+    const seconds = parseInt(refreshInterval);
+    setCountdown(seconds);
+    const tick = setInterval(() => {
+      setCountdown(prev => {
+        const idleMs = Date.now() - lastActivityRef.current;
+        if (idleMs < 1000) return seconds;
+        if (prev !== null && prev <= 1) {
+          fetchItems(true);
+          return seconds;
+        }
+        return prev === null ? seconds : prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [refreshInterval, fetchItems]);
+
+  const handleRefreshChange = (value: string) => {
+    setRefreshInterval(value);
+    localStorage.setItem(REFRESH_KEY, value);
+    setCountdown(value === 'disabled' ? null : parseInt(value));
+    lastActivityRef.current = Date.now();
+  };
 
   const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     try {
@@ -265,6 +320,26 @@ function DashboardContent() {
                         {s === 'RECEIVED' ? 'New' : s}
                     </button>
                 ))}
+            </div>
+            <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
+                <select
+                    value={refreshInterval}
+                    onChange={(e) => handleRefreshChange(e.target.value)}
+                    aria-label="Auto-refresh interval"
+                    className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-600 cursor-pointer outline-none appearance-none pl-3 pr-1 py-2"
+                >
+                    {REFRESH_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+                {countdown !== null ? (
+                    <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap pr-2 tabular-nums">
+                        <span className={`h-2 w-2 rounded-full ${countdown <= 5 ? 'bg-red-500 animate-pulse' : 'bg-blue-600'}`} />
+                        {countdown}s
+                    </span>
+                ) : (
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 whitespace-nowrap pr-3">Off</span>
+                )}
             </div>
             <button onClick={() => signOut()} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-red-500 hover:border-red-100 transition-all shadow-sm group">
                 <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
