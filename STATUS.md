@@ -1,5 +1,12 @@
 # Project Status - PrintFrenzy
 
+### 28. ⚡ Notification Query Optimization (Live)
+- **Composite Index**: Added `idx_notifications_poll` on `notifications (user_email, read, timestamp DESC)` to `schema.sql`. The poll query (`WHERE user_email = ? AND read = 0 AND timestamp > ? ORDER BY timestamp DESC LIMIT 50`) previously had no index and full-scanned the table on every poll. Verified via `EXPLAIN QUERY PLAN` that D1 now uses the index (`SEARCH notifications USING INDEX idx_notifications_poll`) with no sort step.
+- **Client Poll Cursor Fix**: `ToastNotifications.tsx` previously only advanced `lastPoll` when `data.length > 0`. When nothing new arrived (the normal steady state), `since` stayed pinned at page-load time, so every 10s poll re-read **all** unread rows for the user across every open dashboard tab. The cursor now advances on every successful poll, so steady-state polls return ~0 rows.
+- **Impact**: Per-poll rows-read drops from the full unread table size to just newly-arrived rows, cutting D1 row-read volume substantially.
+
+---
+
 ### 27. 🛡️ Privilege Escalation and Security Hardening (Live)
 - **Role Segregation**: Restrained all user management APIs (CRUD operations, password resets, and email changes) and database-clearing operations (`/api/admin/clear`) to the `ADMIN` role. This prevents `MANAGER` accounts from escalating privileges, managing other admins, or performing full database purges.
 - **Frontend Route Protection**: Added path-level role checks in `middleware.ts` to redirect unauthorized users (role `USER`) trying to access `/admin/*` routes to the dashboard page early.

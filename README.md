@@ -73,6 +73,7 @@ Protecting the production data and team access:
 - **R2 Upload Security**: Increased to 20MB limit with MIME whitelist (PNG, JPEG, WEBP, GIF, PDF, HEIC, HEIF, AVIF, SVG, BMP, TIFF) and magic-byte validation.
 - **Comprehensive Axiom Logging**: 17 operations across all API routes logged — login attempts, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, and user changes. Edge-safe with `await log.error` replacing `console.error`.
 - **YAGNI Code Cleanup**: ~560 lines of dead/redundant code removed — unused backup utilities, dead reports page, overkill theme API route, duplicate shipping page, and legacy scripts. See [`CLEANUP.md`](./CLEANUP.md).
+- **Notification Query Optimization**: Added a composite index `(user_email, read, timestamp DESC)` on `notifications` and fixed the client poll cursor so it advances on every successful poll (previously it only advanced when new notifications arrived, causing every 10s poll to re-scan all unread rows). Cuts D1 rows-read per poll dramatically.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.

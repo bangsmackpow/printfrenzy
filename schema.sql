@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX IF NOT EXISTS idx_notifications_poll ON notifications (user_email, read, timestamp DESC);
+
 CREATE TABLE IF NOT EXISTS rate_limits (
     ip TEXT,
     endpoint TEXT,

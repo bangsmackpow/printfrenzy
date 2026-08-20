@@ -57,8 +57,8 @@ export function useNotifications(onNotificationClick?: (notification: Notificati
         const data = await res.json();
         if (data.length > 0) {
           setNotifications(prev => [...data.map((n: any) => ({ ...n, type: 'INFO' })), ...prev]);
-          setLastPoll(new Date().toISOString());
         }
+        setLastPoll(new Date().toISOString());
       }
     } catch (err) {
       console.error("Poll error:", err);
