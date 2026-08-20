@@ -8,7 +8,7 @@ export const runtime = 'edge';
 const VALID_STAGES = ['RECEIVED', 'ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED', 'ARCHIVED'];
 
 function sanitizeError(e: unknown): never {
-  if (e instanceof Error) console.error("Notification API error:", e.message);
+  if (e instanceof Error) log.error("Notification API error", { error: e.message });
   return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
 }
 
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       const { searchParams } = new URL(req.url);
       const since = searchParams.get('since');
       
-      let query = "SELECT * FROM notifications WHERE user_email = ? AND read = 0";
+      let query = "SELECT id, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by, timestamp FROM notifications WHERE user_email = ? AND read = 0";
       const bindParams: string[] = [email!];
       
       if (since) {

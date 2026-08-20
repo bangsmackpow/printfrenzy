@@ -1,5 +1,20 @@
 # Project Status - PrintFrenzy
 
+### 29. ⚡ Cloudflare Best-Practice Alignment (Live)
+D1, R2, Edge, and search brought in line with Cloudflare best practices:
+- **D1 Indexes**: Added indexes on the hot query paths — `orders(status)`, `orders(order_number)`, `orders(created_at DESC)`, `audit_logs(action_type/user_email/timestamp DESC/order_id)`, `shipments(order_number)`, `rate_limits(timestamp)`. Verified via `EXPLAIN QUERY PLAN` (full table `SCAN orders` → `SEARCH ... USING INDEX`).
+- **N+1 → Batch Writes**: Converted per-row `.run()` loops in bulk-status, status, Wix sync, CSV import, and Wix webhook to single atomic `db.batch([...])` calls (audit + notification + order inserts).
+- **Column Projection**: Trimmed `SELECT *` on hot paths (auth login, user password, notification poll) to only the columns consumed.
+- **Rate Limiter**: Kept the D1-backed limiter (the native Rate Limiting binding is Workers-only and not supported on Cloudflare Pages). Optimized cleanup to delete only the requester's expired rows instead of scanning the whole table.
+- **Axiom Logging**: Logger now buffers and flushes events in batches, fire-and-forget, so logging never blocks the request/response path.
+- **FTS5 Full-Text Search**: Replaced the 7-column `LIKE '%term%'` scan with an FTS5 virtual table (`orders_fts`) kept in sync via triggers (using the reliable `DELETE WHERE rowid` pattern). `/api/search` now uses `MATCH`. See `migrations/0001_orders_fts.sql`.
+- **R2 Cache Headers**: Uploads now set `Cache-Control: public, max-age=31536000, immutable` (safe — keys are UUID-versioned). R2 public URL centralized in `src/utils/config.ts`.
+- **Migrations Workflow**: Added `migrations/` directory and `migrations_dir` to `wrangler.toml`. Removed stale `d1_backup-03192026.sql` and legacy `migration.sql` (superseded by `schema.sql`).
+- **Git Hygiene**: Removed tracked `.wrangler/` local D1 state files from the repo (`.wrangler/` is gitignored).
+- **console.error → log.error**: Replaced remaining unstructured `console.error` calls in admin, notifications, and shipping routes.
+
+---
+
 ### 28. ⚡ Notification Query Optimization (Live)
 - **Composite Index**: Added `idx_notifications_poll` on `notifications (user_email, read, timestamp DESC)` to `schema.sql`. The poll query (`WHERE user_email = ? AND read = 0 AND timestamp > ? ORDER BY timestamp DESC LIMIT 50`) previously had no index and full-scanned the table on every poll. Verified via `EXPLAIN QUERY PLAN` that D1 now uses the index (`SEARCH notifications USING INDEX idx_notifications_poll`) with no sort step.
 - **Client Poll Cursor Fix**: `ToastNotifications.tsx` previously only advanced `lastPoll` when `data.length > 0`. When nothing new arrived (the normal steady state), `since` stayed pinned at page-load time, so every 10s poll re-read **all** unread rows for the user across every open dashboard tab. The cursor now advances on every successful poll, so steady-state polls return ~0 rows.

@@ -182,6 +182,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
         let count = 0;
         let skipped = 0;
+        const importInserts: D1PreparedStatement[] = [];
         for (const record of records) {
             const wixOrderNum = record['order number'] || record['order id'] || record['order_number'] || null;
             const customerName = record['customer name'] || record['billing name'] || record['customer_name'] || 'Unknown';
@@ -225,12 +226,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
             }
 
             if (imageUrl) {
-                await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
-                    .bind(crypto.randomUUID(), batchName || wixOrderNum || "IMPORT", customerName, productName, cleanedVariant, imageUrl, orderedAt, qty).run();
+                importInserts.push(db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
+                    .bind(crypto.randomUUID(), batchName || wixOrderNum || "IMPORT", customerName, productName, cleanedVariant, imageUrl, orderedAt, qty));
                 count++;
             } else {
                 skipped++;
             }
+        }
+
+        if (importInserts.length > 0) {
+            await db.batch(importInserts);
         }
         
         await log.info("CSV Import successful", { user: userEmail, imported: count, total: records.length, skipped });
@@ -251,22 +256,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
       const placeholders = orderIds.map(() => '?').join(',');
       const existingOrders = await db.prepare(`SELECT id, order_number, customer_name, product_name, status FROM orders WHERE id IN (${placeholders})`).bind(...orderIds).all();
-      await db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds).run();
+      const statements: D1PreparedStatement[] = [
+        db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds)
+      ];
       
       const subscribers = await db.prepare("SELECT user_email FROM notification_subscriptions WHERE stage = ?").bind(status).all();
       const subscribersList = (subscribers.results as { user_email: string }[]).map(s => s.user_email);
       
       for (const order of (existingOrders.results as { id: string; order_number: string; customer_name: string; product_name: string; status: string }[])) {
-        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
-          .bind(order.id, order.order_number, userEmail, `Status: ${order.status} → ${status}`, JSON.stringify({ from: order.status, to: status })).run();
+        statements.push(db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
+          .bind(order.id, order.order_number, userEmail, `Status: ${order.status} → ${status}`, JSON.stringify({ from: order.status, to: status })));
         
         for (const subEmail of subscribersList) {
           if (subEmail !== userEmail) {
-            await db.prepare("INSERT INTO notifications (user_email, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-              .bind(subEmail, order.id, order.order_number, order.customer_name, order.product_name, order.status, status, userEmail).run();
+            statements.push(db.prepare("INSERT INTO notifications (user_email, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+              .bind(subEmail, order.id, order.order_number, order.customer_name, order.product_name, order.status, status, userEmail));
           }
         }
       }
+      await db.batch(statements);
       
       await log.info("Bulk status update successful", { user: userEmail, count: orderIds.length });
       return NextResponse.json({ success: true });
@@ -282,18 +290,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       await db.prepare("UPDATE orders SET status = ? WHERE id = ?").bind(status, id).run();
       
       if (existing) {
-        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
-          .bind(id, existing.order_number, userEmail, `Status: ${existing.status} → ${status}`, JSON.stringify({ from: existing.status, to: status })).run();
+        const statements: D1PreparedStatement[] = [
+          db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
+            .bind(id, existing.order_number, userEmail, `Status: ${existing.status} → ${status}`, JSON.stringify({ from: existing.status, to: status }))
+        ];
         
         const subscribers = await db.prepare("SELECT user_email FROM notification_subscriptions WHERE stage = ?").bind(status).all();
         const subscribersList = (subscribers.results as { user_email: string }[]).map(s => s.user_email);
         
         for (const subEmail of subscribersList) {
           if (subEmail !== userEmail) {
-            await db.prepare("INSERT INTO notifications (user_email, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-              .bind(subEmail, id, existing.order_number, existing.customer_name, existing.product_name, existing.status, status, userEmail).run();
+            statements.push(db.prepare("INSERT INTO notifications (user_email, order_id, order_number, customer_name, product_name, from_stage, to_stage, moved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+              .bind(subEmail, id, existing.order_number, existing.customer_name, existing.product_name, existing.status, status, userEmail));
           }
         }
+        await db.batch(statements);
       }
       
       await log.info("order_status_changed", {
@@ -423,6 +434,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
             const data = await wRes.json();
             const orders = data.orders || [];
+            const pageInserts: D1PreparedStatement[] = [];
 
             for (const order of orders) {
                 const orderNumber = order.number.toString();
@@ -444,11 +456,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
                     }
 
                     if (imageUrl) {
-                        await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
-                            .bind(crypto.randomUUID(), orderNumber, customerName, productName, variant, imageUrl, orderedAt, qty).run();
+                        pageInserts.push(db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
+                            .bind(crypto.randomUUID(), orderNumber, customerName, productName, variant, imageUrl, orderedAt, qty));
                         addedCount++;
                     }
                 }
+            }
+
+            if (pageInserts.length > 0) {
+                await db.batch(pageInserts);
             }
 
             pageCount++;

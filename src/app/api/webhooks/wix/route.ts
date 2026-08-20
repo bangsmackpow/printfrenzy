@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
 
     let addedCount = 0;
     let skippedCount = 0;
+    const inserts: D1PreparedStatement[] = [];
 
     for (const item of (order.lineItems || [])) {
       const productName = (item.name || "Product").toUpperCase();
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (imageUrl) {
-        await db.prepare(
+        inserts.push(db.prepare(
           "INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')"
         ).bind(
           crypto.randomUUID(),
@@ -125,9 +126,13 @@ export async function POST(req: NextRequest) {
           imageUrl,
           orderedAt,
           qty
-        ).run();
+        ));
         addedCount++;
       }
+    }
+
+    if (inserts.length > 0) {
+      await db.batch(inserts);
     }
 
     await log.info("Wix webhook processed", { orderNumber, added: addedCount, skipped: skippedCount, eventType });

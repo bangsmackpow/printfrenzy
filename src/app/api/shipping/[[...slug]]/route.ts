@@ -221,7 +221,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
           return NextResponse.json({ success: true, tracking_number: recentLabel.tracking_number, label_url: recentLabel.label_url, recovered: true });
         }
       } catch (e) {
-        console.error("Duplicate check failed, proceeding anyway", e);
+        await log.warn("Duplicate label check failed, proceeding anyway", { user: userEmail, order: finalOrderNumber, error: e instanceof Error ? e.message : String(e) });
       }
 
       await log.info("Purchasing shipping label", { user: userEmail, order: finalOrderNumber, rate_id });

@@ -1,6 +1,10 @@
 name = "printfrenzy"
 pages_build_output_dir = ".vercel/output/static"
 
+# Note: this is the output dir used by @cloudflare/next-on-pages for Cloudflare Pages.
+# The repo is deployed via Cloudflare Pages Git integration (push to master); the
+# `wrangler pages deploy` script is an alternative manual path.
+
 compatibility_flags = [ "nodejs_compat" ]
 compatibility_date = "2024-11-18" # Use a very recent date
 
@@ -8,6 +12,7 @@ compatibility_date = "2024-11-18" # Use a very recent date
 binding = "DB"
 database_name = "printfrenzy_db"
 database_id = "be83f295-fb36-4dd0-b2fa-d25d03d6f342"
+migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "BUCKET"

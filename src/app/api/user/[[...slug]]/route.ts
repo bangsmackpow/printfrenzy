@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'password') {
     try {
       const { currentPassword, newPassword } = await req.json();
-      const user = await db.prepare("SELECT * FROM users WHERE email = ?").bind(email).first() as { password_hash: string } | null;
+      const user = await db.prepare("SELECT password_hash FROM users WHERE email = ?").bind(email).first() as { password_hash: string } | null;
       if (!user || !(await verifyPassword(currentPassword, user.password_hash))) {
         await log.warn("user_password_change_rejected", {
           traceId: generateTraceId(),

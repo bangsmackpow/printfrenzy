@@ -65,7 +65,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 ### Pending / Future
 - Email notifications for critical stage transitions
 - Barcode/QR support on packing slips for scan-based status updates
-- Cloudflare native rate limiting on login, upload, and shipping purchase endpoints
+- Cloudflare WAF rate-limiting rules (dashboard-level) as an alternative to the D1-backed limiter — note: the Workers `[[ratelimits]]` binding is NOT supported on Cloudflare Pages
 - Automated Wix tracking number pushback after label purchase
 - Add `image_url2-4` support to Wix sync & CSV import (currently only manual orders)
 - Webhook retry handling for failed Wix webhook deliveries
@@ -100,9 +100,17 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 
 ### Utilities
 - `src/utils/hashUtils.ts` — PBKDF2 100k iterations
-- `src/utils/logger.ts` — Axiom integration utility
+- `src/utils/logger.ts` — buffered, fire-and-forget Axiom integration
 - `src/utils/trace.ts` — Trace ID generation
 - `src/utils/wixUtils.ts` — image URL transformation
+- `src/utils/config.ts` — centralized R2 public URL
+- `src/utils/rateLimiter.ts` — D1-backed rate limiter (per-requester cleanup)
+
+### Database & Migrations
+- `schema.sql` — canonical idempotent schema + all indexes
+- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`)
+- **Indexes**: all hot query paths are indexed (`orders(status/order_number/created_at)`, `audit_logs(action_type/user_email/timestamp/order_id)`, `shipments(order_number)`, `notifications(user_email,read,timestamp)`, `rate_limits(timestamp)`). Verify changes with `EXPLAIN QUERY PLAN` before/after.
+- **FTS5**: `orders_fts` virtual table + triggers (INSERT/UPDATE/DELETE) keep full-text search in sync. `/api/search` uses `MATCH`. If you change `orders` columns, update `migrations/0001_orders_fts.sql` and re-run it (idempotent).
 
 ### Config & CI
 - `.github/workflows/security-scan.yml` — npm audit level fixed
@@ -113,4 +121,4 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - Always push to GitHub after completing feature batches or documentation updates
 - Update `README.md` and `STATUS.md` after each major feature or security pass
 - Run `npm audit --audit-level=critical` before pushing
-- Verify remote D1 sync after schema changes (`wrangler d1 execute ... --remote`)
+- Apply schema/migration changes to remote D1 and verify with `EXPLAIN QUERY PLAN` (`wrangler d1 execute ... --remote --file=`, or `wrangler d1 migrations apply`)

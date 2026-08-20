@@ -74,6 +74,7 @@ Protecting the production data and team access:
 - **Comprehensive Axiom Logging**: 17 operations across all API routes logged — login attempts, Wix webhooks, admin CRUD, order lifecycle, shipping, search, notifications, and user changes. Edge-safe with `await log.error` replacing `console.error`.
 - **YAGNI Code Cleanup**: ~560 lines of dead/redundant code removed — unused backup utilities, dead reports page, overkill theme API route, duplicate shipping page, and legacy scripts. See [`CLEANUP.md`](./CLEANUP.md).
 - **Notification Query Optimization**: Added a composite index `(user_email, read, timestamp DESC)` on `notifications` and fixed the client poll cursor so it advances on every successful poll (previously it only advanced when new notifications arrived, causing every 10s poll to re-scan all unread rows). Cuts D1 rows-read per poll dramatically.
+- **Cloudflare Best-Practice Alignment**: D1 indexes on all hot query paths (verified with `EXPLAIN QUERY PLAN`), N+1 loops converted to atomic `db.batch()` writes, `SELECT *` trimmed on hot paths, optimized D1 rate limiter cleanup, buffered fire-and-forget Axiom logging, **FTS5 full-text search** replacing the 7-column `%LIKE%` scan, R2 `Cache-Control: immutable` headers, centralized R2 URL config, and a `migrations/` workflow. See `STATUS.md` #29.
 
 ⏳ **In Progress / Next Phase**:
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.

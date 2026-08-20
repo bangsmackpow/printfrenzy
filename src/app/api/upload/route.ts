@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { log } from "@/utils/logger";
 import { generateTraceId } from "@/utils/trace";
 import { isRateLimited } from "@/utils/rateLimiter";
+import { R2_PUBLIC_URL } from "@/utils/config";
 
 export const runtime = 'edge';
 
@@ -116,11 +117,10 @@ export async function POST(req: NextRequest) {
     const key = `uploads/${crypto.randomUUID()}.${ext}`;
     
     await bucket.put(key, buffer, {
-      httpMetadata: { contentType: file.type }
+      httpMetadata: { contentType: file.type, cacheControl: 'public, max-age=31536000, immutable' }
     });
 
-    const baseUrl = process.env.R2_PUBLIC_URL || `https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev`;
-    const publicUrl = `${baseUrl}/${key}`;
+    const publicUrl = `${R2_PUBLIC_URL}/${key}`;
 
     await log.info("Upload successful", { ...fileContext, key, publicUrl });
 

@@ -11,7 +11,7 @@ interface D1Database {
 }
 
 interface R2Bucket {
-  put: (key: string, value: ArrayBuffer | string | ReadableStream, options?: { httpMetadata?: { contentType?: string } }) => Promise<void>;
+  put: (key: string, value: ArrayBuffer | string | ReadableStream, options?: { httpMetadata?: { contentType?: string; cacheControl?: string } }) => Promise<void>;
   get: (key: string) => Promise<{ text: () => Promise<string>, arrayBuffer: () => Promise<ArrayBuffer> } | null>;
   delete: (key: string) => Promise<void>;
 }

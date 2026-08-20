@@ -24,8 +24,11 @@ export async function isRateLimited(
   const cutoff = now - durationSeconds;
 
   try {
+    // Batch: cleanup only this requester's expired rows (not the whole table),
+    // record the request, then count within the window. Targeted cleanup keeps
+    // the query indexed and avoids full-table scans on every request.
     const results = (await db.batch([
-      db.prepare("DELETE FROM rate_limits WHERE timestamp < ?").bind(cutoff),
+      db.prepare("DELETE FROM rate_limits WHERE ip = ? AND endpoint = ? AND timestamp < ?").bind(ip, endpoint, cutoff),
       db.prepare("INSERT INTO rate_limits (ip, endpoint, timestamp) VALUES (?, ?, ?)").bind(ip, endpoint, now),
       db.prepare("SELECT COUNT(*) as count FROM rate_limits WHERE ip = ? AND endpoint = ? AND timestamp > ?").bind(ip, endpoint, cutoff)
     ])) as Array<{ results?: Array<{ count: number }> }>;

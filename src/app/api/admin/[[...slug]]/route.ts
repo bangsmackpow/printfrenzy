@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { hashPassword, verifyPassword } from "@/utils/hashUtils";
 import { log } from "@/utils/logger";
 import { generateTraceId } from "@/utils/trace";
+import { R2_PUBLIC_URL } from "@/utils/config";
 
 export const runtime = 'edge';
 
@@ -10,7 +11,7 @@ const VALID_ROLES = ['ADMIN', 'MANAGER', 'USER'] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function sanitizeError(e: unknown): never {
-  if (e instanceof Error) console.error("Admin API error:", e.message);
+  log.error("Admin API error", { error: e instanceof Error ? e.message : 'Unknown' });
   return NextResponse.json({ error: "Internal server error" }, { status: 500 }) as never;
 }
 
@@ -230,7 +231,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'backfill-images') {
     try {
       const before = await db.prepare("SELECT COUNT(*) as count FROM orders WHERE image_url IS NULL OR image_url = ''").first() as { count: number };
-      await db.prepare("UPDATE orders SET image_url = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg' WHERE image_url IS NULL OR image_url = ''").run();
+      await db.prepare("UPDATE orders SET image_url = ? WHERE image_url IS NULL OR image_url = ''").bind(`${R2_PUBLIC_URL}/placeholder.svg`).run();
       log.info("admin_backfill_images", {
         traceId: generateTraceId(),
         userEmail: session.user?.email,

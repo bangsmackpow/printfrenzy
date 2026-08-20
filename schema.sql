@@ -75,9 +75,20 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE INDEX IF NOT EXISTS idx_notifications_poll ON notifications (user_email, read, timestamp DESC);
 
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders (order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs (action_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_email ON audit_logs (user_email);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_order_id ON audit_logs (order_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_order_number ON shipments (order_number);
+
 CREATE TABLE IF NOT EXISTS rate_limits (
     ip TEXT,
     endpoint TEXT,
     timestamp INTEGER,
     PRIMARY KEY (ip, endpoint, timestamp)
 );
+
+CREATE INDEX IF NOT EXISTS idx_rate_limits_timestamp ON rate_limits (timestamp);

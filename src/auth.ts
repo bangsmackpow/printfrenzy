@@ -22,7 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (!db) return null;
 
           const email = (credentials?.email as string || "").trim();
-          const userQueryResult = await db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)")
+          const userQueryResult = await db.prepare("SELECT id, email, role, theme, password_hash FROM users WHERE LOWER(email) = LOWER(?)")
             .bind(email)
             .first();
           
