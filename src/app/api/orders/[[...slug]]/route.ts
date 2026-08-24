@@ -169,7 +169,10 @@ function buildDedupKey(orderNumber: string | null, customerName: string, product
 async function loadExistingKeys(db: D1Database, orderNumbers: (string | null)[]): Promise<Set<string>> {
   const keys = new Set<string>();
   const distinct = Array.from(new Set(orderNumbers.filter((n): n is string => Boolean(n && n.trim()))));
-  const CHUNK = 400;
+  // D1 caps bound parameters at 100 per query. The IN(...) clause appears twice
+  // (order_number OR source_order_number), so N order numbers consume 2N binds.
+  // Chunk small enough to stay well under the cap regardless of file size.
+  const CHUNK = 40;
   for (let i = 0; i < distinct.length; i += CHUNK) {
     const chunk = distinct.slice(i, i + CHUNK);
     const placeholders = chunk.map(() => '?').join(',');
