@@ -61,6 +61,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 24. **USPS Address Validation**: Client-side format checks (ZIP, state, required fields) + Shippo Address Validation API before rate fetching. Auto-corrects addresses, rejects invalid ones before charges, displays USPS classification (residential/commercial). Color-coded UI feedback (red errors, amber warnings, green corrected address).
 25. **Database Robustness and Deletion Fixes**: Re-ordered deletion transactions in `db.batch()` to purge `audit_logs` before parent `orders`. Bound `null` instead of non-existent order IDs in deletion logs to satisfy the SQLite foreign key constraint. Defaulted all CSV parsing and shipping destructuring results to fallback null/string values to prevent `undefined` binding crashes (`D1_TYPE_ERROR`) in Cloudflare D1.
 26. **YAGNI Cleanup**: Removed ~560 lines of dead/redundant code — `backupUtils.ts` (unused), `admin/reports/page.tsx` (non-existent API), `api/user/theme/route.ts` (localStorage suffices), `shipping/page.tsx` (duplicates order details), and 5 legacy scripts (`gen-hash.js`, `gen-light-hash.js`, `test-hash.js`, `fix-password.js`, `create-admin.js`). Kept `seed-admin.mjs` as the single admin seed script. See `CLEANUP.md`.
+27. **CSV Import Review & Select**: The `/import` page now offers two side-by-side modes — **Quick Import** (original blind upload, unchanged) and **Review & Select** (preview every line item with per-item checkboxes, skip duplicates already in the queue, import only what's checked). One import submission = ONE batch card (the batch name becomes `order_number`, the display name in the queue). Dedup uses an exact line-item key (order_number + customer + product + variant + quantity, case-insensitive) against both `order_number` and the new `source_order_number` column (which preserves the original Wix order number for future dedup). Added `POST /api/orders/import/preview` (parse + flag duplicates) and `POST /api/orders/import/select` (JSON batch insert with server-side re-dedup, chunked 100/batch). Rows without a valid image are now importable (null `image_url`). Requires migration `0002_orders_source_order_number.sql`.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
@@ -77,7 +78,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `schema.sql` — D1 schema definitions
 
 ### API Routes
-- `src/app/api/orders/[[...slug]]/route.ts` — status, bulk, sync, manual, update, delete, update-item, update-notes (with Axiom logging)
+- `src/app/api/orders/[[...slug]]/route.ts` — status, bulk, sync, manual, update, delete, update-item, update-notes, **import (Quick), import/preview, import/select** (with Axiom logging)
 - `src/app/api/admin/[[...slug]]/route.ts` — users, audit, stats, clear, password reset, backfill-images
 - `src/app/api/notifications/[[...slug]]/route.ts` — subscribe, poll, mark-read
 - `src/app/api/search/route.ts` — universal search
@@ -88,6 +89,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 
 ### UI Pages
 - `src/app/dashboard/page.tsx` — main queue, notifications, search integration, lightbox
+- `src/app/import/page.tsx` — CSV import with **Quick Import** (blind) and **Review & Select** (preview grid + checkboxes, duplicate flagging)
 - `src/app/orders/print/page.tsx` — order sheets, 2x2 quadrants, packing slip layout
 - `src/app/orders/new/page.tsx` — manual order form with 4-image upload (**supports PDF**)
 - `src/app/orders/[id]/edit/page.tsx` — full order modification (**supports PDF**)
@@ -108,9 +110,10 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 
 ### Database & Migrations
 - `schema.sql` — canonical idempotent schema + all indexes
-- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`)
+- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`, `0002_orders_source_order_number.sql`)
 - **Indexes**: all hot query paths are indexed (`orders(status/order_number/created_at)`, `audit_logs(action_type/user_email/timestamp/order_id)`, `shipments(order_number)`, `notifications(user_email,read,timestamp)`, `rate_limits(timestamp)`). Verify changes with `EXPLAIN QUERY PLAN` before/after.
-- **FTS5**: `orders_fts` virtual table + triggers (INSERT/UPDATE/DELETE) keep full-text search in sync. `/api/search` uses `MATCH`. If you change `orders` columns, update `migrations/0001_orders_fts.sql` and re-run it (idempotent).
+- **FTS5**: `orders_fts` virtual table + triggers (INSERT/UPDATE/DELETE) keep full-text search in sync. `/api/search` uses `MATCH`. If you change `orders` columns, update `migrations/0001_orders_fts.sql` and re-run it (idempotent). The `source_order_number` dedup column does not need to be in FTS.
+- **CSV Import Dedup**: the dedup key is `order_number|source_order_number + customer_name + product_name + variant + quantity` compared case-insensitively. The original Wix order number is stored in `source_order_number` so future exports of the same orders are flagged as already imported even after the batch name replaces `order_number`.
 
 ### Config & CI
 - `.github/workflows/security-scan.yml` — npm audit level fixed

@@ -9,6 +9,7 @@ PrintFrenzy is a specialized internal tool built for Built Networks, LLC (Cresto
 ### 🎯 Pro-Production Workflow
 The goal of this application is to minimize the "clicks-to-print" ratio:
 - **Wix Direct Sync**: Real-time order fetching via the "Sync Wix" button, eliminating the need for CSV imports.
+- **CSV Import Review & Select**: Two side-by-side import modes — a quick blind upload, and a **Review & Select** flow that previews every line item with checkboxes, flags what's already in the queue, and imports only your selection as a single batch card.
 - **Auto-Image Uplifting**: Automatically transforms low-res Wix thumbnails into 1500px+ production-quality images via `wixUtils.ts`.
 - **Manual Orders**: Drag-and-drop design uploads directly to Cloudflare R2 for off-platform or custom jobs.
 - **Accountability**: Real-time logging of exactly which staff member moved which design through the production pipeline.

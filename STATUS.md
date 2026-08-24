@@ -1,5 +1,14 @@
 # Project Status - PrintFrenzy
 
+### 30. 🧮 CSV Import Review & Select (Live)
+- **Side-by-Side Modes**: The `/import` page now offers **Quick Import** (the original blind upload — unchanged) and **Review & Select** (preview every line item, tick what to import, skip what's already in the queue).
+- **Preview & Duplicate Flagging**: `POST /api/orders/import/preview` parses the CSV, normalizes each row, and flags rows already in the queue via an exact line-item key (order number + customer + product + variant + quantity, case-insensitive). Duplicate cards render disabled with an "Already in Queue" badge.
+- **One Submission = One Order**: `POST /api/orders/import/select` inserts only the checked line items as a single batch — the batch name becomes the display name (`order_number`) in the queue; if empty, an `IMPORT-<timestamp>` name is auto-generated. Server-side re-dedup skips anything that now matches (also prevents duplicate rows within one file). Inserts are chunked 100/batch to stay within D1 limits.
+- **Wix Order Number Preserved**: The original Wix order number is stored in the new `source_order_number` column so future exports of the same orders are still flagged as already imported after the batch name replaces `order_number`. Requires migration `0002_orders_source_order_number.sql`.
+- **No-Image Rows Importable**: Rows with a missing/invalid image URL (e.g. literal `Unknown`) now import with a `null` `image_url` instead of being silently skipped.
+
+---
+
 ### 29. ⚡ Cloudflare Best-Practice Alignment (Live)
 D1, R2, Edge, and search brought in line with Cloudflare best practices:
 - **D1 Indexes**: Added indexes on the hot query paths — `orders(status)`, `orders(order_number)`, `orders(created_at DESC)`, `audit_logs(action_type/user_email/timestamp DESC/order_id)`, `shipments(order_number)`, `rate_limits(timestamp)`. Verified via `EXPLAIN QUERY PLAN` (full table `SCAN orders` → `SEARCH ... USING INDEX`).

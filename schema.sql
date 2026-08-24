@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     order_number TEXT,
+    source_order_number TEXT,
     customer_name TEXT,
     product_name TEXT,
     variant TEXT,

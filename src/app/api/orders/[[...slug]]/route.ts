@@ -84,7 +84,109 @@ function parseCSV(text: string) {
   });
 }
 
-async function sanitizeError(e: unknown, context: Record<string, any> = {}): Promise<NextResponse> {
+interface ImportRow {
+  orderNumber: string | null;
+  customerName: string;
+  productName: string;
+  variant: string;
+  imageUrl: string | null;
+  orderedAt: string | null;
+  quantity: number;
+}
+
+interface SelectedImportRow {
+  orderNumber?: string | null;
+  customerName?: string;
+  productName?: string;
+  variant?: string;
+  imageUrl?: string | null;
+  orderedAt?: string | null;
+  quantity?: number | string;
+}
+
+function extractRow(record: Record<string, string>): ImportRow {
+  const orderNumber = record['order number'] || record['order id'] || record['order_number'] || null;
+  const customerName = record['customer name'] || record['billing name'] || record['customer_name'] || 'Unknown';
+  const productName = record['product name'] || record['lineitem name'] || record['product_name'] || 'Product';
+  const variant = (record['product variant'] || record['lineitem options'] || record['variant'] || '').trim();
+  let imageUrl = record['product image url'] || record['product image'] || record['lineitem image url'] || record['image_url'] || null;
+  const orderedAt = record['date'] || record['ordered_at'] || null;
+  const quantity = parseInt(record['quantity'] || '1', 10) || 1;
+
+  if (imageUrl) {
+    const trimmed = imageUrl.trim().toLowerCase();
+    if (trimmed === 'unknown' || trimmed === 'none' || trimmed === 'n/a' || trimmed === 'null') {
+      imageUrl = null;
+    }
+  }
+
+  if (!imageUrl) {
+    // Fallback: search all columns for any image or Wix image URL
+    for (const key of Object.keys(record)) {
+      const val = record[key];
+      if (typeof val === 'string' && val) {
+        // Find matches for HTTP/HTTPS or wix:image:// URLs
+        const matches = val.match(/(https?:\/\/[^\s"]+|wix:image:\/\/[^\s"]+)/gi);
+        if (matches) {
+          for (const url of matches) {
+            const lowercaseUrl = url.toLowerCase();
+            const hasImageExt = /\.(jpg|jpeg|png|gif|webp|heic|heif|avif|svg|bmp|tiff)(?:[?#]|$)/.test(lowercaseUrl);
+            const isWixUrl = lowercaseUrl.includes('wixstatic.com') || lowercaseUrl.startsWith('wix:image://');
+            if (hasImageExt || isWixUrl) {
+              imageUrl = url;
+              break;
+            }
+          }
+        }
+        if (imageUrl) break;
+      }
+    }
+  }
+
+  if (imageUrl && !/^(https?:\/\/|wix:image:\/\/)/i.test(imageUrl.trim())) {
+    imageUrl = null;
+  }
+
+  let cleanedVariant = variant;
+  if (imageUrl) {
+    // If the imageUrl is part of the variant string, remove it to keep the variant text clean in the UI.
+    cleanedVariant = cleanedVariant.replace(imageUrl, '').trim();
+    // Remove trailing labels like "Upload design: ", "Upload Artwork: ", "Design: ", etc., if they are now empty
+    cleanedVariant = cleanedVariant.replace(/(?:Upload\s+)?(?:design|artwork|file|image|photo)s?(?:\s*file)?\s*:\s*(?=[,;]|$)/gi, '');
+    // Clean up trailing/leading commas, semicolons, and spaces
+    cleanedVariant = cleanedVariant.replace(/^[,;\s]+|[,;\s]+$/g, '').replace(/,\s*,/g, ',').replace(/;\s*;/g, ';').trim();
+  }
+
+  return { orderNumber, customerName, productName, variant: cleanedVariant, imageUrl, orderedAt, quantity };
+}
+
+function buildDedupKey(orderNumber: string | null, customerName: string, productName: string, variant: string, quantity: number): string {
+  return [orderNumber || '', customerName, productName, variant, quantity]
+    .map(v => String(v).trim().toLowerCase())
+    .join('||');
+}
+
+async function loadExistingKeys(db: D1Database, orderNumbers: (string | null)[]): Promise<Set<string>> {
+  const keys = new Set<string>();
+  const distinct = Array.from(new Set(orderNumbers.filter((n): n is string => Boolean(n && n.trim()))));
+  const CHUNK = 400;
+  for (let i = 0; i < distinct.length; i += CHUNK) {
+    const chunk = distinct.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const res = await db.prepare(
+      `SELECT order_number, source_order_number, customer_name, product_name, variant, quantity FROM orders WHERE order_number IN (${placeholders}) OR source_order_number IN (${placeholders})`
+    ).bind(...chunk, ...chunk).all();
+    for (const row of (res.results as { order_number: string | null; source_order_number: string | null; customer_name: string; product_name: string; variant: string; quantity: number }[])) {
+      const wixNum = row.source_order_number || row.order_number;
+      if (wixNum) {
+        keys.add(buildDedupKey(wixNum, row.customer_name, row.product_name, row.variant || '', row.quantity));
+      }
+    }
+  }
+  return keys;
+}
+
+async function sanitizeError(e: unknown, context: Record<string, unknown> = {}): Promise<NextResponse> {
   const traceId = generateTraceId();
   const message = e instanceof Error ? e.message : "Unknown error";
   await log.error("Orders API failure", { traceId, error: message, ...context });
@@ -154,7 +256,112 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (slug?.[0] === 'import') {
+  if (slug?.[0] === 'import' && slug?.[1] === 'preview') {
+    // NEW: preview a CSV, flag rows already in the queue, return checkable line items
+    try {
+      const formData = await req.formData();
+      const file = formData.get('file') as File;
+      if (!file) {
+        await log.warn("CSV Import preview failed: No file", { user: userEmail });
+        return NextResponse.json({ error: "No file" }, { status: 400 });
+      }
+      if (file.size > MAX_CSV_SIZE) {
+        await log.warn("CSV Import preview rejected: File too large", { user: userEmail, size: file.size });
+        return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
+      }
+
+      const text = await file.text();
+      const records = parseCSV(text);
+
+      if (records.length > MAX_CSV_RECORDS) {
+        await log.warn("CSV Import preview rejected: Too many records", { user: userEmail, count: records.length });
+        return NextResponse.json({ error: `Too many records (max ${MAX_CSV_RECORDS})` }, { status: 400 });
+      }
+      if (records.length === 0) {
+        return NextResponse.json({ error: "CSV has no data rows" }, { status: 400 });
+      }
+
+      const rows = records.map((r) => extractRow(r));
+
+      const existingKeys = await loadExistingKeys(db, rows.map((r) => r.orderNumber));
+      let duplicateCount = 0;
+      const flagged = rows.map((r, i) => {
+        const duplicate = existingKeys.has(buildDedupKey(r.orderNumber, r.customerName, r.productName, r.variant, r.quantity));
+        if (duplicate) duplicateCount++;
+        return {
+          rowIndex: i,
+          orderNumber: r.orderNumber,
+          customerName: r.customerName,
+          productName: r.productName,
+          variant: r.variant,
+          imageUrl: r.imageUrl,
+          orderedAt: r.orderedAt,
+          quantity: r.quantity,
+          duplicate,
+        };
+      });
+
+      await log.info("CSV Import preview generated", { user: userEmail, filename: file.name, total: flagged.length, duplicateCount });
+      return NextResponse.json({ rows: flagged, total: flagged.length, duplicateCount });
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
+  }
+
+  if (slug?.[0] === 'import' && slug?.[1] === 'select') {
+    // NEW: import only the user-selected line items as a single batch, skipping duplicates
+    try {
+      const body = await req.json();
+      const batchName = (body.batch_name || "").trim();
+      const rows: SelectedImportRow[] = Array.isArray(body.rows) ? (body.rows as SelectedImportRow[]) : [];
+
+      if (rows.length === 0) {
+        await log.warn("CSV Import failed: No rows selected", { user: userEmail });
+        return NextResponse.json({ error: "No rows selected" }, { status: 400 });
+      }
+      if (rows.length > MAX_CSV_RECORDS) {
+        return NextResponse.json({ error: `Too many records (max ${MAX_CSV_RECORDS})` }, { status: 400 });
+      }
+
+      await log.info("CSV Import started", { user: userEmail, count: rows.length, batchName });
+
+      const orderNumber = batchName || `IMPORT-${Date.now()}`;
+      const existingKeys = await loadExistingKeys(db, rows.map((r) => r.orderNumber || null));
+
+      let count = 0;
+      let skipped = 0;
+      const importInserts: D1PreparedStatement[] = [];
+      const seenKeys = new Set(existingKeys);
+
+      for (const row of rows) {
+        const orderNo = row.orderNumber || null;
+        const customerName = row.customerName || 'Unknown';
+        const productName = row.productName || 'Product';
+        const variant = (row.variant || '').trim();
+        const imageUrl = row.imageUrl || null;
+        const orderedAt = row.orderedAt || null;
+        const qty = parseInt(String(row.quantity), 10) || 1;
+
+        const key = buildDedupKey(orderNo, customerName, productName, variant, qty);
+        if (seenKeys.has(key)) {
+          skipped++;
+          continue;
+        }
+        seenKeys.add(key);
+
+        importInserts.push(db.prepare("INSERT INTO orders (id, order_number, source_order_number, customer_name, product_name, variant, image_url, ordered_at, quantity, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED')")
+          .bind(crypto.randomUUID(), orderNumber, orderNo, customerName, productName, variant, imageUrl, orderedAt, qty));
+        count++;
+      }
+
+      for (let i = 0; i < importInserts.length; i += 100) {
+        await db.batch(importInserts.slice(i, i + 100));
+      }
+
+      await log.info("CSV Import successful", { user: userEmail, imported: count, total: rows.length, skipped });
+      return NextResponse.json({ count, skipped });
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
+  }
+
+  if (slug?.[0] === 'import' && slug?.length === 1) {
     try {
         const formData = await req.formData();
         const file = formData.get('file') as File;
