@@ -63,6 +63,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 26. **YAGNI Cleanup**: Removed ~560 lines of dead/redundant code — `backupUtils.ts` (unused), `admin/reports/page.tsx` (non-existent API), `api/user/theme/route.ts` (localStorage suffices), `shipping/page.tsx` (duplicates order details), and 5 legacy scripts (`gen-hash.js`, `gen-light-hash.js`, `test-hash.js`, `fix-password.js`, `create-admin.js`). Kept `seed-admin.mjs` as the single admin seed script. See `CLEANUP.md`.
 27. **CSV Import Review & Select**: The `/import` page now offers two side-by-side modes — **Quick Import** (original blind upload, unchanged) and **Review & Select** (preview every line item with per-item checkboxes, skip duplicates already in the queue, import only what's checked). One import submission = ONE batch card (the batch name becomes `order_number`, the display name in the queue). Dedup uses an exact line-item key (order_number + customer + product + variant + quantity, case-insensitive) against both `order_number` and the new `source_order_number` column (which preserves the original Wix order number for future dedup). Added `POST /api/orders/import/preview` (parse + flag duplicates) and `POST /api/orders/import/select` (JSON batch insert with server-side re-dedup, chunked 100/batch). Rows without a valid image are now importable (null `image_url`). Requires migration `0002_orders_source_order_number.sql`.
 28. **Client-Side Telemetry**: Client errors are now captured in Axiom, not just the browser console. `src/utils/clientLogger.ts` buffers events and POSTs them (fire-and-forget, `keepalive`) to the new session-protected `POST /api/telemetry` route, which forwards them through the existing logger with the user's email. All client `console.error` calls in pages/components route through it. Login logs (`src/auth.ts`) now include source `ip` + `userAgent` (from `x-forwarded-for`/`cf-connecting-ip`).
+29. **Auto-Growing Order Form Textareas**: The single-line **Size / Variant** input on the Edit Order and New Order pages is now a wrapping, auto-resizing `<textarea>` (`src/components/AutoGrowTextarea.tsx`) so long values (e.g. jersey `NAME ON BACK:: / NUMBER::` options) display fully without sideways scrolling. The same auto-grow treatment was applied to **Personalization / Prints Name** and **Production Notes** on both pages. Reusable component; no backend changes.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
@@ -101,6 +102,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `src/components/Sidebar.tsx` — navigation + search bar
 - `src/components/ToastNotifications.tsx` — polling hook + toast UI
 - `src/components/ImageLightbox.tsx` — multi-image modal with keyboard nav
+- `src/components/AutoGrowTextarea.tsx` — wrapping, auto-resizing textarea for order forms
 
 ### Utilities
 - `src/utils/hashUtils.ts` — PBKDF2 100k iterations

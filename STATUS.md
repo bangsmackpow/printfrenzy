@@ -1,5 +1,11 @@
 # Project Status - PrintFrenzy
 
+### 32. 🧱 Auto-Growing Order Form Textareas (Live)
+- **Size/Variant Wraps & Grows**: The single-line Size/Variant input on `/orders/[id]/edit` and `/orders/new` is now a wrapping, auto-resizing textarea via the new reusable `src/components/AutoGrowTextarea.tsx`. Long values (e.g. jersey `NAME ON BACK::` / `NUMBER::` options) wrap and the box height grows to fit all text — no sideways scrolling.
+- **Consistent Treatment**: Personalization / Prints Name and Production Notes on both pages now use the same auto-grow component (they were fixed-height textareas that scrolled vertically).
+
+---
+
 ### 31. 📡 Client-Side Telemetry & Login Source Data (Live)
 - **Client Errors → Axiom**: New `src/utils/clientLogger.ts` buffers client-side events (fire-and-forget, `keepalive`) and POSTs them to a new session-protected `POST /api/telemetry` route, which forwards them through the existing Axiom logger tagged with the user's email. All browser `console.error` calls across pages/components now route through it, so silent UI failures (dashboard polls, imports, note saves, search, uploads, label purchase) are debuggable after the fact.
 - **Login IP / User-Agent**: `auth.ts` now captures `x-forwarded-for`/`cf-connecting-ip` + `user-agent` on login success, wrong-password, and user-not-found events for security analysis.
@@ -7,6 +13,7 @@
 ---
 
 ### 30. 🧮 CSV Import Review & Select (Live)
+- **D1 Bound-Parameter Fix**: The dedup lookup (`loadExistingKeys`) chunks at 40 order numbers per query because D1 caps prepared statements at 100 bound parameters (each order number binds twice — `order_number` OR `source_order_number`). The initial build generated a 140-param query for a 70-order export, which D1 rejected with `too many SQL variables`, surfacing as a 500 on `/api/orders/import/preview`.
 - **Side-by-Side Modes**: The `/import` page now offers **Quick Import** (the original blind upload — unchanged) and **Review & Select** (preview every line item, tick what to import, skip what's already in the queue).
 - **Preview & Duplicate Flagging**: `POST /api/orders/import/preview` parses the CSV, normalizes each row, and flags rows already in the queue via an exact line-item key (order number + customer + product + variant + quantity, case-insensitive). Duplicate cards render disabled with an "Already in Queue" badge.
 - **One Submission = One Order**: `POST /api/orders/import/select` inserts only the checked line items as a single batch — the batch name becomes the display name (`order_number`) in the queue; if empty, an `IMPORT-<timestamp>` name is auto-generated. Server-side re-dedup skips anything that now matches (also prevents duplicate rows within one file). Inserts are chunked 100/batch to stay within D1 limits.
