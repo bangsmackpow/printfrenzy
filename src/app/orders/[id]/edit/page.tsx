@@ -5,23 +5,9 @@ export const runtime = "edge";
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { AutoGrowTextarea } from '@/components/AutoGrowTextarea';
 
 const PLACEHOLDER_URL = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg';
-
-interface Order {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  product_name: string;
-  variant: string;
-  image_url: string;
-  image_url2?: string;
-  image_url3?: string;
-  image_url4?: string;
-  quantity: number;
-  print_name?: string;
-  notes?: string;
-}
 
 export default function EditOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -208,33 +194,30 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
 
           <div className="space-y-2">
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Size / Variant</label>
-            <input
-              type="text"
+            <AutoGrowTextarea
               value={formData.variant}
               onChange={(e) => setFormData({ ...formData, variant: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase"
+              className="w-full min-h-[3.5rem] bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase"
               placeholder="e.g. ADULT XL"
             />
           </div>
 
           <div className="space-y-2">
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Personalization / Prints Name</label>
-            <textarea
+            <AutoGrowTextarea
               value={formData.print_name}
               onChange={(e) => setFormData({ ...formData, print_name: e.target.value })}
-              rows={3}
-              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase italic"
+              className="w-full min-h-[4.5rem] bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all uppercase italic"
               placeholder="ENTER NAMES HERE..."
             />
           </div>
 
           <div className="space-y-2">
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Notes</label>
-            <textarea
+            <AutoGrowTextarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={2}
-              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="w-full min-h-[3.5rem] bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               placeholder="Internal notes..."
             />
           </div>
