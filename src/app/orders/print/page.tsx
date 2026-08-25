@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
+import { logClient } from '@/utils/clientLogger';
 import Image from 'next/image';
 
 interface Order {
@@ -49,7 +50,7 @@ function PrintContent() {
         setSelectedBatches(batches);
       }
     } catch (err) {
-      console.error("Print fetch error:", err);
+      logClient.error('print_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       setLoading(false);
     }

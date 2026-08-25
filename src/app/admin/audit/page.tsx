@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { logClient } from '@/utils/clientLogger';
 
 interface AuditLog {
   id: number;
@@ -46,7 +47,7 @@ export default function AuditAdmin() {
         setLogs(data);
       }
     } catch (err) {
-      console.error("Failed to fetch audit logs:", err);
+      logClient.error('admin_audit_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export default function AuditAdmin() {
         setUsers(data.map((u: { user_email: string }) => u.user_email));
       }
     } catch (err) {
-      console.error("Failed to fetch users:", err);
+      logClient.error('admin_audit_users_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -71,7 +72,7 @@ export default function AuditAdmin() {
         setStats(await res.json());
       }
     } catch (err) {
-      console.error("Failed to fetch stats:", err);
+      logClient.error('admin_stats_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
     }
   };
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from '@/context/ThemeContext';
+import { logClient } from '@/utils/clientLogger';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface SearchResult {
@@ -46,7 +47,7 @@ export function Sidebar() {
         setResults(await res.json());
       }
     } catch (err) {
-      console.error("Search error:", err);
+      logClient.error('search_failed', { term, error: err instanceof Error ? err.message : String(err) });
     } finally {
       setSearching(false);
     }

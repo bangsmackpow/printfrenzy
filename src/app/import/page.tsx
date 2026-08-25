@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Image from 'next/image';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
+import { logClient } from '@/utils/clientLogger';
 
 type ImportMode = 'quick' | 'review';
 type Status = "idle" | "uploading" | "previewing" | "importing" | "success" | "error";
@@ -98,7 +99,7 @@ export default function CSVImport() {
         setErrorMessage(data.error || "Failed to process the CSV file.");
       }
     } catch (err) {
-      console.error("Import error:", err);
+      logClient.error('import_quick_failed', { error: err instanceof Error ? err.message : String(err) });
       setStatus("error");
       setErrorMessage("A network error occurred. Please try again.");
     }
@@ -130,7 +131,7 @@ export default function CSVImport() {
         setErrorMessage(data.error || "Failed to preview the CSV file.");
       }
     } catch (err) {
-      console.error("Preview error:", err);
+      logClient.error('import_preview_failed', { error: err instanceof Error ? err.message : String(err) });
       setStatus("error");
       setErrorMessage("A network error occurred while previewing. Please try again.");
     }
@@ -193,7 +194,7 @@ export default function CSVImport() {
         setErrorMessage(data.error || "Failed to import the selected items.");
       }
     } catch (err) {
-      console.error("Import error:", err);
+      logClient.error('import_select_failed', { count: selected.size, error: err instanceof Error ? err.message : String(err) });
       setStatus("error");
       setErrorMessage("A network error occurred. Please try again.");
     }

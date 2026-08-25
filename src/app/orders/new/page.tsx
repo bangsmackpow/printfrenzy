@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { AutoGrowTextarea } from '@/components/AutoGrowTextarea';
+import { logClient } from '@/utils/clientLogger';
 
 const PLACEHOLDER_URL = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg';
 
@@ -40,7 +41,7 @@ export default function NewOrderPage() {
             setFormData(prev => ({ ...prev, [`image_url${slot === 1 ? '' : slot}`]: data.publicUrl }));
         }
     } catch (err) {
-        console.error("Upload failed", err);
+        logClient.error('order_new_upload_failed', { slot, error: err instanceof Error ? err.message : String(err) });
     } finally {
         setUploading(prev => ({ ...prev, [slot]: false }));
     }
@@ -69,7 +70,7 @@ export default function NewOrderPage() {
         alert(data.error || 'Failed to create order');
       }
     } catch (err) {
-      console.error(err);
+      logClient.error('order_new_submit_failed', { error: err instanceof Error ? err.message : String(err) });
       alert('A network error occurred');
     } finally {
       setLoading(false);

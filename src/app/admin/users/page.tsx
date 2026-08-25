@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { logClient } from '@/utils/clientLogger';
 
 interface User {
   id: string;
@@ -37,7 +38,7 @@ export default function AdminUsersPage() {
         setUsers(await res.json());
       }
     } catch (err) {
-      console.error(err);
+      logClient.error('admin_users_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export default function AdminUsersPage() {
         alert(data.error);
       }
     } catch (err) {
-      console.error(err);
+      logClient.error('admin_user_create_failed', { email, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -76,7 +77,7 @@ export default function AdminUsersPage() {
       });
       if (res.ok) alert("Password reset successfully");
     } catch (err) {
-      console.error(err);
+      logClient.error('admin_password_reset_failed', { id, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -88,7 +89,7 @@ export default function AdminUsersPage() {
             fetchUsers();
         }
     } catch (err) {
-        console.error(err);
+        logClient.error('admin_user_delete_failed', { id, error: err instanceof Error ? err.message : String(err) });
     }
   };
 

@@ -62,6 +62,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 25. **Database Robustness and Deletion Fixes**: Re-ordered deletion transactions in `db.batch()` to purge `audit_logs` before parent `orders`. Bound `null` instead of non-existent order IDs in deletion logs to satisfy the SQLite foreign key constraint. Defaulted all CSV parsing and shipping destructuring results to fallback null/string values to prevent `undefined` binding crashes (`D1_TYPE_ERROR`) in Cloudflare D1.
 26. **YAGNI Cleanup**: Removed ~560 lines of dead/redundant code — `backupUtils.ts` (unused), `admin/reports/page.tsx` (non-existent API), `api/user/theme/route.ts` (localStorage suffices), `shipping/page.tsx` (duplicates order details), and 5 legacy scripts (`gen-hash.js`, `gen-light-hash.js`, `test-hash.js`, `fix-password.js`, `create-admin.js`). Kept `seed-admin.mjs` as the single admin seed script. See `CLEANUP.md`.
 27. **CSV Import Review & Select**: The `/import` page now offers two side-by-side modes — **Quick Import** (original blind upload, unchanged) and **Review & Select** (preview every line item with per-item checkboxes, skip duplicates already in the queue, import only what's checked). One import submission = ONE batch card (the batch name becomes `order_number`, the display name in the queue). Dedup uses an exact line-item key (order_number + customer + product + variant + quantity, case-insensitive) against both `order_number` and the new `source_order_number` column (which preserves the original Wix order number for future dedup). Added `POST /api/orders/import/preview` (parse + flag duplicates) and `POST /api/orders/import/select` (JSON batch insert with server-side re-dedup, chunked 100/batch). Rows without a valid image are now importable (null `image_url`). Requires migration `0002_orders_source_order_number.sql`.
+28. **Client-Side Telemetry**: Client errors are now captured in Axiom, not just the browser console. `src/utils/clientLogger.ts` buffers events and POSTs them (fire-and-forget, `keepalive`) to the new session-protected `POST /api/telemetry` route, which forwards them through the existing logger with the user's email. All client `console.error` calls in pages/components route through it. Login logs (`src/auth.ts`) now include source `ip` + `userAgent` (from `x-forwarded-for`/`cf-connecting-ip`).
 
 ### Pending / Future
 - Email notifications for critical stage transitions
@@ -83,6 +84,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `src/app/api/notifications/[[...slug]]/route.ts` — subscribe, poll, mark-read
 - `src/app/api/search/route.ts` — universal search
 - `src/app/api/upload/route.ts` — R2 upload with **20MB limit**, magic-byte validation, and Axiom logging
+- `src/app/api/telemetry/route.ts` — session-protected client-error ingest → Axiom
 - `src/app/api/shipping/[[...slug]]/route.ts` — Shippo rates/purchase (with Axiom logging)
 - `src/app/api/user/[[...slug]]/route.ts` — self password reset
 - `src/app/api/webhooks/wix/route.ts` — Wix webhook with HMAC verification
@@ -103,6 +105,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 ### Utilities
 - `src/utils/hashUtils.ts` — PBKDF2 100k iterations
 - `src/utils/logger.ts` — buffered, fire-and-forget Axiom integration
+- `src/utils/clientLogger.ts` — buffered client-side error reporting → `/api/telemetry`
 - `src/utils/trace.ts` — Trace ID generation
 - `src/utils/wixUtils.ts` — image URL transformation
 - `src/utils/config.ts` — centralized R2 public URL

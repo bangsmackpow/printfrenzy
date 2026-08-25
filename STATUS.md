@@ -1,5 +1,11 @@
 # Project Status - PrintFrenzy
 
+### 31. 📡 Client-Side Telemetry & Login Source Data (Live)
+- **Client Errors → Axiom**: New `src/utils/clientLogger.ts` buffers client-side events (fire-and-forget, `keepalive`) and POSTs them to a new session-protected `POST /api/telemetry` route, which forwards them through the existing Axiom logger tagged with the user's email. All browser `console.error` calls across pages/components now route through it, so silent UI failures (dashboard polls, imports, note saves, search, uploads, label purchase) are debuggable after the fact.
+- **Login IP / User-Agent**: `auth.ts` now captures `x-forwarded-for`/`cf-connecting-ip` + `user-agent` on login success, wrong-password, and user-not-found events for security analysis.
+
+---
+
 ### 30. 🧮 CSV Import Review & Select (Live)
 - **Side-by-Side Modes**: The `/import` page now offers **Quick Import** (the original blind upload — unchanged) and **Review & Select** (preview every line item, tick what to import, skip what's already in the queue).
 - **Preview & Duplicate Flagging**: `POST /api/orders/import/preview` parses the CSV, normalizes each row, and flags rows already in the queue via an exact line-item key (order number + customer + product + variant + quantity, case-insensitive). Duplicate cards render disabled with an "Already in Queue" badge.

@@ -6,6 +6,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { AutoGrowTextarea } from '@/components/AutoGrowTextarea';
+import { logClient } from '@/utils/clientLogger';
 
 const PLACEHOLDER_URL = 'https://pub-0a9a68a0e7bd45fd90bf38ff3ec0e00b.r2.dev/placeholder.svg';
 
@@ -54,7 +55,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
           }
         }
       } catch (err) {
-        console.error("Failed to fetch order", err);
+        logClient.error('order_edit_fetch_failed', { id, error: err instanceof Error ? err.message : String(err) });
       } finally {
         setFetching(false);
       }
@@ -80,7 +81,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
             setFormData(prev => ({ ...prev, [`image_url${slot === 1 ? '' : slot}`]: data.publicUrl }));
         }
     } catch (err) {
-        console.error("Upload failed", err);
+        logClient.error('order_edit_upload_failed', { slot, error: err instanceof Error ? err.message : String(err) });
     } finally {
         setUploading(prev => ({ ...prev, [slot]: false }));
     }
@@ -110,7 +111,7 @@ export default function EditOrderPage({ params }: { params: Promise<{ id: string
         alert(data.error || 'Failed to update order');
       }
     } catch (err) {
-      console.error(err);
+      logClient.error('order_edit_submit_failed', { id, error: err instanceof Error ? err.message : String(err) });
       alert('A network error occurred');
     } finally {
       setLoading(false);

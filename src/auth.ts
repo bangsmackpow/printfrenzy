@@ -16,10 +16,16 @@ declare module "next-auth" {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         try {
           const db = (process.env as unknown as { DB: D1Database }).DB;
           if (!db) return null;
+
+          const ip = (request?.headers?.get('x-forwarded-for') || '').split(',')[0]?.trim()
+            || request?.headers?.get('cf-connecting-ip')
+            || 'unknown';
+          const userAgent = request?.headers?.get('user-agent') || 'unknown';
+          const client = { ip, userAgent };
 
           const email = (credentials?.email as string || "").trim();
           const userQueryResult = await db.prepare("SELECT id, email, role, theme, password_hash FROM users WHERE LOWER(email) = LOWER(?)")
@@ -29,7 +35,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const user = userQueryResult as { id: string; email: string; role: string; theme: string; password_hash: string } | null;
 
           if (!user) {
-            await log.warn("Login attempt failed: User not found", { email });
+            await log.warn("Login attempt failed: User not found", { email, ...client });
             return null;
           }
 
@@ -37,11 +43,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const isMatch = await verifyPassword(inputPass, user.password_hash);
 
           if (isMatch) {
-            await log.info("Login successful", { email, role: user.role, id: user.id });
+            await log.info("Login successful", { email, role: user.role, id: user.id, ...client });
             return { id: user.id, email: user.email, role: user.role, theme: user.theme || 'light' };
           }
           
-          await log.warn("Login attempt failed: Wrong password", { email, role: user.role });
+          await log.warn("Login attempt failed: Wrong password", { email, role: user.role, ...client });
           return null;
         } catch (error) {
           await log.error("Auth error", { error: error instanceof Error ? error.message : "Unknown" });

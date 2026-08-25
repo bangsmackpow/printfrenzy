@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from "next-auth/react";
+import { logClient } from '@/utils/clientLogger';
 
 interface Notification {
   id: number;
@@ -61,7 +62,7 @@ export function useNotifications(onNotificationClick?: (notification: Notificati
         setLastPoll(new Date().toISOString());
       }
     } catch (err) {
-      console.error("Poll error:", err);
+      logClient.error('notifications_poll_failed', { error: err instanceof Error ? err.message : String(err) });
     }
   }, [session, lastPoll]);
 

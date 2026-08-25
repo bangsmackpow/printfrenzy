@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
+import { logClient } from '@/utils/clientLogger';
 import { useSession, signOut } from "next-auth/react";
 import Image from 'next/image';
 import { ToastNotifications, useNotifications } from '@/components/ToastNotifications';
@@ -58,7 +59,7 @@ function DashboardContent() {
         setSubscriptions(data.map((s: { stage: string }) => s.stage));
       }
     } catch (err) {
-      console.error("Fetch subscriptions error:", err);
+      logClient.error('dashboard_fetch_subscriptions_failed', { error: err instanceof Error ? err.message : String(err) });
     }
   }, []);
 
@@ -76,7 +77,7 @@ function DashboardContent() {
         );
       }
     } catch (err) {
-      console.error("Toggle subscription error:", err);
+      logClient.error('dashboard_toggle_subscription_failed', { stage, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -92,7 +93,7 @@ function DashboardContent() {
         setItems(await res.json());
       }
     } catch (err) {
-      console.error("Fetch error:", err);
+      logClient.error('dashboard_fetch_failed', { error: err instanceof Error ? err.message : String(err) });
     } finally {
       if (!silent) setLoading(false);
     }
@@ -110,7 +111,7 @@ function DashboardContent() {
         alert("Sync Failed: " + (data.error || "Unknown error"));
       }
     } catch (err) {
-      console.error("Sync error:", err);
+      logClient.error('dashboard_sync_failed', { error: err instanceof Error ? err.message : String(err) });
       alert("Sync failed to execute.");
     } finally {
       setSyncing(false);
@@ -185,7 +186,7 @@ function DashboardContent() {
         setItems(prev => prev.map(item => item.id === orderId ? { ...item, status: newStatus } : item));
       }
     } catch (err) {
-      console.error("Update error:", err);
+      logClient.error('dashboard_status_update_failed', { orderId, newStatus, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -203,7 +204,7 @@ function DashboardContent() {
         setSelectedIds([]);
       }
     } catch (err) {
-      console.error("Bulk update error:", err);
+      logClient.error('dashboard_bulk_status_update_failed', { newStatus, count: selectedIds.length, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -218,7 +219,7 @@ function DashboardContent() {
         alert(`Delete failed: ${data.error}`);
       }
     } catch (err) {
-      console.error("Delete error:", err);
+      logClient.error('dashboard_delete_batch_failed', { orderNumber, error: err instanceof Error ? err.message : String(err) });
       alert("Delete failed. Check with an administrator.");
     }
   };
@@ -234,7 +235,7 @@ function DashboardContent() {
         alert(`Delete failed: ${data.error}`);
       }
     } catch (err) {
-      console.error("Delete error:", err);
+      logClient.error('dashboard_delete_item_failed', { id, orderNumber, error: err instanceof Error ? err.message : String(err) });
       alert("Delete failed. Check with an administrator.");
     }
   };

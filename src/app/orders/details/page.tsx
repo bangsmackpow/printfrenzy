@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
+import { logClient } from '@/utils/clientLogger';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 
@@ -56,7 +57,7 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
         } catch (err) {
-            console.error("Failed to copy:", err);
+            logClient.error('details_copy_label_failed', { error: err instanceof Error ? err.message : String(err) });
         }
     };
 
@@ -117,7 +118,7 @@ function ShippingBlock({ orderNumber, customerName }: { orderNumber: string, cus
                 setShipment(data);
                 setRates([]);
             } else {
-                console.error("Purchase Error Details:", data.details);
+                logClient.error('details_purchase_failed', { orderNumber, error: data.error, details: data.details });
                 const detailMsg = data.details?.messages?.[0]?.text || data.details?.message || "";
                 setError(data.error + (detailMsg ? `: ${detailMsg}` : ""));
             }
@@ -292,7 +293,7 @@ function DetailContent() {
         alert(`Failed to update: ${data.error}`);
       }
     } catch (err) {
-      console.error("Update error:", err);
+      logClient.error('details_status_update_failed', { orderId, newStatus, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -310,7 +311,7 @@ function DetailContent() {
                 }
             }
         } catch (err) {
-            console.error("Fetch error:", err);
+            logClient.error('details_fetch_failed', { orderNumber, error: err instanceof Error ? err.message : String(err) });
         }
     }
     startFetching();
@@ -325,10 +326,10 @@ function DetailContent() {
             body: JSON.stringify({ order_number: orderNumber, notes: batchNote })
         });
         if (!res.ok) {
-            console.error("Failed to save note");
+            logClient.error('details_note_save_failed', { orderNumber });
         }
     } catch (err) {
-        console.error("Note save error:", err);
+        logClient.error('details_note_save_error', { orderNumber, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
@@ -343,7 +344,7 @@ function DetailContent() {
         alert(`Delete failed: ${data.error}`);
       }
     } catch (err) {
-      console.error("Delete error:", err);
+      logClient.error('details_delete_failed', { id, error: err instanceof Error ? err.message : String(err) });
     }
   };
 
