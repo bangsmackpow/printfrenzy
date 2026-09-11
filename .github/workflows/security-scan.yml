@@ -67,12 +67,13 @@ jobs:
         with:
           node-version: "20"
           cache: 'npm'
-      # Blocking: only production (runtime) deps are deployed to the edge, so the critical
-      # check audits those. Build-time-only advisories (e.g. `tar` under the deprecated
-      # @cloudflare/next-on-pages) cannot ship and are reported non-blocking below.
-      - name: NPM Audit (production criticals - blocking)
-        if: always()
-        run: npm audit --omit=dev --audit-level=critical
+      # Blocking: fail on any CRITICAL *production* advisory not explicitly allowlisted in
+      # .github/audit-allowlist.json (currently the Next framework advisories we are pinned
+      # to because the deprecated next-on-pages builder cannot build a patched Next >=16.3.3).
+      # A NEW runtime critical still blocks the build. Dev-toolchain advisories (e.g. `tar`)
+      # are non-blocking informational below.
+      - name: NPM Audit (production criticals - blocking, allowlist applied)
+        run: npm audit --omit=dev --json | node .github/audit-gate.mjs
       - name: NPM Audit (full tree incl. dev toolchain - informational)
         run: npm audit --audit-level=critical
         continue-on-error: true
