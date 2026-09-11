@@ -1,9 +1,7 @@
 {
-  "$comment": "Advisories intentionally tolerated while the app is pinned to next@16.2.6, the highest Next version the deprecated @cloudflare/next-on-pages (peer 'next: >=14.3.0 && <=15.5.2') can actually build. The blocking CI audit (.github/audit-gate.mjs) still fails on any critical NOT listed here.",
-  "reason": "Staying on Cloudflare Pages via next-on-pages. Patched Next (>=16.3.3) fails the Pages build because next-on-pages bundles @vercel/next@4.12.4, which cannot emit Next 16.3 output.",
-  "removal_condition": "Resolve by migrating off next-on-pages to OpenNext or vinext on Workers, then bumping next to a patched >=16.3.x and emptying this allowlist.",
+  "$comment": "Advisories intentionally tolerated while the app is pinned to next@16.2.6 + next-auth@5.0.0-beta.31, the highest versions the DEPRECATED @cloudflare/next-on-pages (peer 'next: >=14.3.0 && <=15.5.2', bundled @vercel/next@4.12.4) can build. Verified by Pages builds: bumping next to 16.3.5 (builds 8f049372/00afe73c) and next-auth to beta.32/@auth/core 0.41.3 (preview 7f7aab57) each FAIL the Cloudflare Pages build. The blocking CI gate (.github/audit-gate.mjs) still fails on any CRITICAL not listed here.",
+  "removal_condition": "Migrate off @cloudflare/next-on-pages to OpenNext or vinext on Workers, then bump next to a patched >=16.3.x and next-auth to a patched beta (>=beta.32 / @auth/core 0.41.3+) and EMPTY this allowlist. Until then these are accepted, tracked risk.",
   "reviewBy": "2026-12-31",
-  "package": "next",
   "allow": [
     "GHSA-6gpp-xcg3-4w24",
     "GHSA-m99w-x7hq-7vfj",
@@ -15,6 +13,25 @@
     "GHSA-q8wf-6r8g-63ch",
     "GHSA-955p-x3mx-jcvp",
     "GHSA-p293-qw3h-jr36",
-    "GHSA-2xp9-vwfh-vxw4"
-  ]
+    "GHSA-2xp9-vwfh-vxw4",
+    "GHSA-8fpg-xm3f-6cx3",
+    "GHSA-7rqj-j65f-68wh",
+    "GHSA-xmf8-cvqr-rfgj",
+    "GHSA-x445-f3h2-j279"
+  ],
+  "grouped": {
+    "next@16.2.6 (pinned by next-on-pages peer cap)": [
+      "GHSA-6gpp-xcg3-4w24", "GHSA-m99w-x7hq-7vfj", "GHSA-89xv-2m56-2m9x",
+      "GHSA-68g3-v927-f742", "GHSA-4633-3j49-mh5q", "GHSA-4c39-4ccg-62r3",
+      "GHSA-p9j2-gv94-2wf4", "GHSA-q8wf-6r8g-63ch", "GHSA-955p-x3mx-jcvp",
+      "GHSA-p293-qw3h-jr36", "GHSA-2xp9-vwfh-vxw4"
+    ],
+    "@auth/core@0.41.2 / next-auth@5.0.0-beta.31 (pinned by next-on-pages build)": [
+      "GHSA-8fpg-xm3f-6cx3", "GHSA-7rqj-j65f-68wh", "GHSA-xmf8-cvqr-rfgj", "GHSA-x445-f3h2-j279"
+    ]
+  },
+  "mitigations": {
+    "GHSA-8fpg-xm3f-6cx3": "Auth fail-open existence check + email issues partially offset by H5 getCurrentUser() live-role re-validation (session.ts); migrate to patched @auth/core to fully close.",
+    "GHSA-6gpp-xcg3-4w24": "Next middleware/proxy bypass: app's real authorization is enforced per-route via auth()/getCurrentUser(), not solely middleware, limiting blast radius."
+  }
 }
