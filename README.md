@@ -28,19 +28,23 @@ The goal of this application is to minimize the "clicks-to-print" ratio:
 ### 🔐 Security & Management
 Protecting the production data and team access:
 - **Unified Security Standards**: PBKDF2 with 100k iterations synchronized across production and administrative scripts.
+- **Live Access Revocation**: `getCurrentUser()` re-reads the role from D1 on every privileged request — deleted or demoted staff lose access immediately, not when their JWT expires.
+- **Rate Limiting (fail-closed)**: login and label-purchase use a D1 limiter that blocks on error and can't be bypassed by concurrent same-second requests.
+- **Double-Charge Protection**: shipping label purchases take an atomic `shipment_locks` claim so two simultaneous requests can't buy two USPS labels.
+- **Upload Validation (fail-closed)**: 20MB cap, MIME whitelist, magic-byte signatures (incl. PDF, webp offset-8), unknown signed types rejected.
 - **Password Management**: Self-service user resets and admin-initiated password resets for all staff.
-- **Destructive Safety**: "Clear All Orders" requires an Admin password re-prompt to confirm the system wipe.
+- **Destructive Safety**: "Clear All Orders" requires an Admin password re-prompt; runs as one ordered D1 batch (child rows first, FK-safe).
 - **Individual Cleanup**: Admins can delete specific orders or entire Wix groups directly from the queue.
 
-### 🛠️ Tech Stack (The "Bleeding Edge" Build)
-- **Framework**: Next.js 16.2.6 (Turbopack enabled)
+### 🛠️ Tech Stack
+- **Framework**: Next.js 16.2.6 (Turbopack enabled) — *pinned, see Known Constraints below*
 - **Runtime**: Cloudflare Pages (Edge Runtime)
-- **Database**: Cloudflare D1 (SQL)
+- **Database**: Cloudflare D1 (SQLite)
 - **Storage**: Cloudflare R2 (S3-compatible)
-- **Auth**: Auth.js v5 (`next-auth@5.0.0-beta.31`)
+- **Auth**: Auth.js v5 (`next-auth@5.0.0-beta.31`) — *pinned, see Known Constraints below*
 - **UI**: React 19.2.3 + Tailwind CSS 4
 - **Language**: TypeScript 5
-- **Deploy**: Wrangler 4.74.0 + `@cloudflare/next-on-pages` 1.13.16
+- **Deploy**: Wrangler 4.x + `@cloudflare/next-on-pages` 1.13.16 (deprecated builder — migration to OpenNext/vinext is the tracked next step)
 
 ---
 
@@ -79,8 +83,10 @@ Protecting the production data and team access:
 - **CSV Import Review & Select**: Two side-by-side import modes on `/import` — Quick Import (original blind upload) and **Review & Select**, which previews every line item with checkboxes, flags rows already in the queue, and imports only your selection as a single batch card. Original Wix order numbers preserved in `source_order_number` for future dedup.
 - **Client-Side Telemetry**: Browser errors (dashboard polls, imports, note saves, search, uploads, label purchase) are buffered and streamed to Axiom via `/api/telemetry`, tagged with the user's email. Login logs now include source IP and user-agent.
 - **Auto-Growing Order Form Textareas**: Size/Variant, Personalization, and Production Notes fields on the Edit and New Order pages wrap and auto-resize so long values are fully viewable without sideways scrolling.
+- **P1 Security & Correctness Pass (Cloudflare-MCP audit)**: hardened the D1 rate limiter, chunked bulk/notification `IN()` queries under D1's bind-param cap, made System Clear an ordered FK-safe batch, added `getCurrentUser()` live-role revocation, added an atomic `shipment_locks` double-charge guard (migration `0003`), and made upload magic-byte validation fail-closed. See `STATUS.md` #33.
 
 ⏳ **In Progress / Next Phase**:
+- **Migrate off `@cloudflare/next-on-pages`** to OpenNext / vinext on Workers — the current builder is deprecated, peer-caps Next at ≤15.5.2, and cannot build patched `next`/`@auth/core` (see Known Constraints). This is the prerequisite for clearing the allowlisted criticals.
 - **Automated Tracking Push**: Automatically update Wix order status and tracking numbers after label purchase.
 - **Barcode Support**: Direct scanning of manifests to trigger movement through the production stages.
 - **Live Dispatch Dashboard**: Real-time status updates across different production workstations.
@@ -98,7 +104,7 @@ Add these to your Cloudflare Pages Dashboard:
 - `DB`: D1 Database Binding.
 - `BUCKET`: R2 Bucket Binding.
 - `ACCOUNT_ID`: Cloudflare Account ID.
-- `NPM_CONFIG_LEGACY_PEER_DEPS`: `true` (Required for Auth v5 build).
+- `NPM_CONFIG_LEGACY_PEER_DEPS`: `true` (required — `@cloudflare/next-on-pages` peer-caps Next at ≤15.5.2 while the app runs Next 16.x)
 - `SHIPPO_API_KEY`: API Key for USPS shipping label generation.
 - `SHIPPO_SENDER_ADDRESS_JSON`: JSON string of the default sender address (requires email & phone).
 - `WIX_API_KEY`: Wix API Key (Direct API sync).
@@ -107,4 +113,12 @@ Add these to your Cloudflare Pages Dashboard:
 - `R2_PUBLIC_URL`: Public URL for R2 bucket (e.g., `https://pub-xxxx.r2.dev`).
 - `AXIOM_DATASET`: Axiom dataset name for high-signal logging.
 - `AXIOM_TOKEN`: Axiom API token for event streaming.
+
+---
+
+### ⚠️ Known Constraints (Security Posture)
+- The app is deployed on Cloudflare **Pages** via `@cloudflare/next-on-pages`, which is **deprecated** and pins `next` to ≤15.5.2 (peer) / `@vercel/next@4.12.4`. As a result we are **pinned to `next@16.2.6` and `next-auth@5.0.0-beta.31`** — bumping either to a security-patched version **fails the Pages build** (verified). This leaves **11 Next + 4 Auth.js critical advisories open**, all enumerated and justified in [`.github/audit-allowlist.json`](./.github/audit-allowlist.json).
+- The CI gate (`.github/audit-gate.mjs`) still **blocks on any *new* production critical** — only the documented pinned set is tolerated.
+- Application-level controls partially offset the auth advisories: `getCurrentUser()` live-role checks (revocation), per-route authorization rather than middleware-only, and fail-closed rate limiting.
+- **The fix** is migrating the deploy target off next-on-pages to **OpenNext or vinext on Workers**, then bumping to patched `next`/`@auth/core` and emptying the allowlist. Until then, treat the Next/Auth.js advisories as accepted, tracked risk.
 

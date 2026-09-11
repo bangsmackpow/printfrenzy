@@ -4,7 +4,7 @@
 
 DTF print queue & production management system. Handles order ingestion (Wix sync, CSV import, manual entry), print queue management with stage-based workflow, shipping label purchasing via Shippo, and production tracking.
 
-**Tech Stack**: Next.js 16.3.5 + Cloudflare Pages + D1 (SQLite) + R2 + Tailwind CSS
+**Tech Stack**: Next.js 16.2.6 (pinned — see Architecture Decisions / audit allowlist) + Cloudflare Pages + D1 (SQLite) + R2 + Tailwind CSS
 
 ## Architecture Decisions
 
@@ -14,6 +14,8 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - **Error Handling**: `sanitizeError()` helper on all API routes — logs real errors to **Axiom**, returns `"Internal server error"` to clients (never leak D1/schema internals)
 - **SQL**: Parameterized queries exclusively — no string interpolation
 - **Observability**: High-signal event streaming to Axiom via `src/utils/logger.ts`.
+- **Auth freshness**: `getCurrentUser()` (`src/utils/session.ts`) re-reads role from D1 on every privileged request (admin/orders/shipping-purchase) — JWT role is a hint only; deleted/demoted accounts are revoked immediately. Adds one indexed `users.email` read per authed request (accepted).
+- **Hosting / framework pinning**: Deployed on Cloudflare Pages via the **deprecated `@cloudflare/next-on-pages`** (build command `npx @cloudflare/next-on-pages@1` lives in the Pages project, not `package.json`; bindings + `compatibility_date` also come from the Pages project settings, not `wrangler.toml`). Its peer-caps (`next <=15.5.2`) and bundled `@vercel/next@4.12.4` **cannot build patched Next (≥16.3.x) or `@auth/core` (≥0.41.3)**, so the app is pinned to `next@16.2.6` + `next-auth@5.0.0-beta.31`. The resulting 15 framework/Auth.js criticals are allowlisted (`.github/audit-allowlist.json` + `.github/audit-gate.mjs`). **Do not bump `next`/`next-auth` without migrating off next-on-pages first** — the Pages build will fail.
 
 ## Security Requirements
 
@@ -124,12 +126,15 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - **CSV Import Dedup**: the dedup key is `order_number|source_order_number + customer_name + product_name + variant + quantity` compared case-insensitively. The original Wix order number is stored in `source_order_number` so future exports of the same orders are flagged as already imported even after the batch name replaces `order_number`.
 
 ### Config & CI
-- `.github/workflows/security-scan.yml` — npm audit level fixed
+- `.github/workflows/security-scan.yml` — Gitleaks + Semgrep/Trivy (informational, SARIF uploads skip-if-absent) + the blocking audit below
+- `.github/audit-gate.mjs` — dependency-free production-critical audit gate; reads `npm audit --omit=dev --json`, fails on any critical not allowlisted
+- `.github/audit-allowlist.json` — the 15 pinned `next@16.2.6` + `@auth/core@0.41.2` criticals (removal condition = migrate off next-on-pages)
 - `README.md`, `STATUS.md`, `AGENTS.md` — project documentation
 
 ## Workflow Rules
 
 - Always push to GitHub after completing feature batches or documentation updates
 - Update `README.md` and `STATUS.md` after each major feature or security pass
-- Run `npm audit --audit-level=critical` before pushing
+- Run the production-deps critical gate before pushing: `npm audit --omit=dev --json | node .github/audit-gate.mjs` (mirrors CI; fails only on un-allowlisted runtime criticals). The full-tree `npm audit` is informational — the dev toolchain (next-on-pages→vercel→`tar`) carries non-shipping advisories.
+- Privileged API handlers must use `getCurrentUser()` (live D1 role re-validation), not the JWT role, and mutating multi-statement writes must go through `db.batch()` with child-rows-first ordering (D1 enforces FKs by default).
 - Apply schema/migration changes to remote D1 and verify with `EXPLAIN QUERY PLAN` (`wrangler d1 execute ... --remote --file=`, or `wrangler d1 migrations apply`)

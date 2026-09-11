@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isRateLimited } from "@/utils/rateLimiter";
 
-// Next 16.3.5: 'edge' is rejected for middleware ("use experimental-edge"); Pages/Workers
-// requires the edge runtime, so this stays experimental-edge despite the generic deprecation warning.
+// Cloudflare Pages requires the Edge runtime, and Next's middleware API expects the
+// explicit "experimental-edge" value (plain "edge" is rejected for middleware). Keep as-is.
 export const runtime = "experimental-edge";
 
 export default async function proxy(request: NextRequest) {
