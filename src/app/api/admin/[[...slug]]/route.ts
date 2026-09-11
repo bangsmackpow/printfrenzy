@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { getCurrentUser } from "@/utils/session";
 import { hashPassword, verifyPassword } from "@/utils/hashUtils";
 import { log } from "@/utils/logger";
 import { generateTraceId } from "@/utils/trace";
@@ -20,8 +21,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  const role = (session?.user as { role?: string })?.role;
-  if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
+  // H5: re-validate the account against D1 (live role + instant revocation on delete).
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Session expired. Please sign in again." }, { status: 401 });
+  const role = user.role;
+  if (role !== 'ADMIN' && role !== 'MANAGER') {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -139,8 +144,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  const role = (session?.user as { role?: string })?.role;
-  if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
+  // H5: re-validate the account against D1 (live role + instant revocation on delete).
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Session expired. Please sign in again." }, { status: 401 });
+  const role = user.role;
+  if (role !== 'ADMIN' && role !== 'MANAGER') {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -262,10 +271,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         return NextResponse.json({ error: "Invalid admin password" }, { status: 401 });
       }
       const orderCount = await db.prepare("SELECT COUNT(*) as count FROM orders").first() as { count: number };
-      await db.prepare("DELETE FROM orders").run();
-      await db.prepare("DELETE FROM shipments").run();
-      await db.prepare("INSERT INTO audit_logs (user_email, action_type, action, details) VALUES (?, 'SYSTEM_CLEAR', 'All orders cleared', ?)")
-        .bind(adminEmail, JSON.stringify({ orders_cleared: orderCount.count })).run();
+      // D1 enforces foreign keys by default and PRAGMA foreign_keys is a no-op inside a
+      // batch (which D1 runs as a transaction), so we cannot DELETE FROM orders while
+      // audit_logs still reference them. Null the audit->order links first (history is
+      // preserved; the audit UI uses a LEFT JOIN), then clear shipments + orders and log
+      // the clear atomically in one transaction so it can't be left half-applied.
+      await db.batch([
+        db.prepare("UPDATE audit_logs SET order_id = NULL WHERE order_id IS NOT NULL"),
+        db.prepare("DELETE FROM shipments"),
+        db.prepare("DELETE FROM orders"),
+        db.prepare("INSERT INTO audit_logs (user_email, action_type, action, details) VALUES (?, 'SYSTEM_CLEAR', 'All orders cleared', ?)")
+          .bind(adminEmail, JSON.stringify({ orders_cleared: orderCount.count })),
+      ]);
       log.info("admin_clear_executed", {
         traceId: generateTraceId(),
         userEmail: adminEmail,
@@ -292,8 +309,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  const role = (session?.user as { role?: string })?.role;
-  if (!session || (role !== 'ADMIN' && role !== 'MANAGER')) {
+  // H5: re-validate the account against D1 (live role + instant revocation on delete).
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Session expired. Please sign in again." }, { status: 401 });
+  const role = user.role;
+  if (role !== 'ADMIN' && role !== 'MANAGER') {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

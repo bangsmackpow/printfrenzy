@@ -21,13 +21,17 @@ const ALLOWED_MIME_TYPES = [
   'image/bmp', 
   'image/tiff'
 ];
-const MAGIC_BYTES: Record<string, number[][]> = {
-  'image/png': [[0x89, 0x50, 0x4e, 0x47]],
-  'image/jpeg': [[0xff, 0xd8, 0xff]],
-  'image/webp': [[0x52, 0x49, 0x46, 0x46], [0x57, 0x45, 0x42, 0x50]],
-  'image/gif': [[0x47, 0x49, 0x46, 0x38]],
-  'image/bmp': [[0x42, 0x4d]],
-  'image/tiff': [[0x49, 0x49, 0x2a, 0x00], [0x4d, 0x4d, 0x00, 0x2a]],
+// Each mime maps to a list of acceptable signatures. A signature is a byte pattern
+// plus the offset it must appear at (webp's "WEBP" tag lives at byte 8, not 0).
+type MagicSignature = { bytes: number[]; offset: number };
+const MAGIC_BYTES: Record<string, MagicSignature[]> = {
+  'image/png': [{ bytes: [0x89, 0x50, 0x4e, 0x47], offset: 0 }],
+  'image/jpeg': [{ bytes: [0xff, 0xd8, 0xff], offset: 0 }],
+  'image/webp': [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }, { bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 }],
+  'image/gif': [{ bytes: [0x47, 0x49, 0x46, 0x38], offset: 0 }],
+  'image/bmp': [{ bytes: [0x42, 0x4d], offset: 0 }],
+  'image/tiff': [{ bytes: [0x49, 0x49, 0x2a, 0x00], offset: 0 }, { bytes: [0x4d, 0x4d, 0x00, 0x2a], offset: 0 }],
+  'application/pdf': [{ bytes: [0x25, 0x50, 0x44, 0x46], offset: 0 }], // %PDF
 };
 
 async function sanitizeError(e: unknown, context: Record<string, any> = {}): Promise<NextResponse> {
@@ -38,7 +42,7 @@ async function sanitizeError(e: unknown, context: Record<string, any> = {}): Pro
 }
 
 function validateMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
-  // Bypass complex/variable containers
+  // Bypass complex/variable containers that can't be reliably sniffed by prefix.
   if (
     mimeType === 'image/heic' || 
     mimeType === 'image/heif' || 
@@ -47,16 +51,24 @@ function validateMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
   ) return true;
 
   const bytes = new Uint8Array(buffer);
-  const expected = MAGIC_BYTES[mimeType];
-  if (!expected) return true;
-  for (const pattern of expected) {
-    let match = true;
-    for (let i = 0; i < pattern.length; i++) {
-      if (bytes[i] !== pattern[i]) { match = false; break; }
+  const signatures = MAGIC_BYTES[mimeType];
+  // Fail-closed: any whitelisted type we don't have a signature for is rejected,
+  // rather than accepted because a client lied about its content-type.
+  if (!signatures) return false;
+
+  // webp must match BOTH the RIFF prefix and the WEBP tag; other types have a
+  // single required signature, so matching any entry is sufficient.
+  const allMatch = (sigs: MagicSignature[]) => sigs.every((sig) => {
+    for (let i = 0; i < sig.bytes.length; i++) {
+      if (bytes[sig.offset + i] !== sig.bytes[i]) return false;
     }
-    if (match) return true;
+    return true;
+  });
+
+  if (mimeType === 'image/webp') {
+    return allMatch(signatures);
   }
-  return false;
+  return signatures.some((sig) => allMatch([sig]));
 }
 
 export async function POST(req: NextRequest) {

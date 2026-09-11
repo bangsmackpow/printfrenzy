@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS shipments (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Atomic guard for shipping-label purchases (see migrations/0003). The INSERT of a
+-- (order_number, customer_name) row is the claim; it is deleted once the purchase
+-- completes, preventing concurrent double-charges on the same order.
+CREATE TABLE IF NOT EXISTS shipment_locks (
+    order_number TEXT NOT NULL,
+    customer_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (order_number, customer_name)
+);
+
 CREATE TABLE IF NOT EXISTS notification_subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_email TEXT NOT NULL,

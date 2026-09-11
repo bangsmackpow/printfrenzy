@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { getCurrentUser } from "@/utils/session";
 import { log } from "@/utils/logger";
 import { generateTraceId } from "@/utils/trace";
 
@@ -246,18 +247,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  const userEmail = session?.user?.email || "unknown";
   const apiKey = req.headers.get("x-api-key");
   const validApiKey = process.env.API_IMPORT_KEY;
-  
-  let authorized = !!session;
-  if (!authorized && slug?.[0] === 'import' && apiKey && validApiKey) {
-    authorized = constantTimeCompare(apiKey, validApiKey);
-  }
+
+  // H5: a session must still map to a live account, so deleted users lose write access
+  // immediately instead of at token expiry. The import API-key path stays sessionless.
+  const user = session ? await getCurrentUser() : null;
+  const importViaApiKey = slug?.[0] === 'import' && !!apiKey && !!validApiKey && constantTimeCompare(apiKey, validApiKey);
+  const authorized = !!user || importViaApiKey;
 
   if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const userEmail = user?.email || "unknown";
 
   if (slug?.[0] === 'import' && slug?.[1] === 'preview') {
     // NEW: preview a CSV, flag rows already in the queue, return checkable line items
@@ -464,16 +467,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       if (orderIds.length > MAX_BULK_IDS) return NextResponse.json({ error: `Too many items (max ${MAX_BULK_IDS})` }, { status: 400 });
       if (!ALLOWED_STATUSES.includes(status as typeof ALLOWED_STATUSES[number])) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
 
-      const placeholders = orderIds.map(() => '?').join(',');
-      const existingOrders = await db.prepare(`SELECT id, order_number, customer_name, product_name, status FROM orders WHERE id IN (${placeholders})`).bind(...orderIds).all();
-      const statements: D1PreparedStatement[] = [
-        db.prepare(`UPDATE orders SET status = ? WHERE id IN (${placeholders})`).bind(status, ...orderIds)
-      ];
-      
+      // D1 caps bind parameters at ~100 per statement, so a single IN(...) over up to
+      // MAX_BULK_IDS (500) ids throws `too many SQL variables`. Dedupe + chunk the id
+      // lists so both the SELECT and each UPDATE stay under the bind limit.
+      const uniqueIds = Array.from(new Set((orderIds as unknown[]).map(String)));
+      const IN_CHUNK = 45; // status param + id params stays well under 100
+
+      const existingOrders: { id: string; order_number: string; customer_name: string; product_name: string; status: string }[] = [];
+      for (let i = 0; i < uniqueIds.length; i += IN_CHUNK) {
+        const chunk = uniqueIds.slice(i, i + IN_CHUNK);
+        const ph = chunk.map(() => '?').join(',');
+        const res = await db.prepare(`SELECT id, order_number, customer_name, product_name, status FROM orders WHERE id IN (${ph})`).bind(...chunk).all();
+        existingOrders.push(...(res.results as typeof existingOrders));
+      }
+
       const subscribers = await db.prepare("SELECT user_email FROM notification_subscriptions WHERE stage = ?").bind(status).all();
       const subscribersList = (subscribers.results as { user_email: string }[]).map(s => s.user_email);
-      
-      for (const order of (existingOrders.results as { id: string; order_number: string; customer_name: string; product_name: string; status: string }[])) {
+
+      const statements: D1PreparedStatement[] = [];
+      for (let i = 0; i < uniqueIds.length; i += IN_CHUNK) {
+        const chunk = uniqueIds.slice(i, i + IN_CHUNK);
+        const ph = chunk.map(() => '?').join(',');
+        statements.push(db.prepare(`UPDATE orders SET status = ? WHERE id IN (${ph})`).bind(status, ...chunk));
+      }
+
+      for (const order of existingOrders) {
         statements.push(db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'STATUS_CHANGE', ?, ?)")
           .bind(order.id, order.order_number, userEmail, `Status: ${order.status} → ${status}`, JSON.stringify({ from: order.status, to: status })));
         
@@ -736,8 +754,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  const userRole = (session?.user as { role?: string })?.role;
-  if (!session || (userRole !== 'ADMIN' && userRole !== 'MANAGER')) {
+  // H5: read the live role from D1 so a demoted/deleted staff account can't keep deleting.
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Session expired. Please sign in again." }, { status: 401 });
+  const userRole = user.role;
+  if (userRole !== 'ADMIN' && userRole !== 'MANAGER') {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

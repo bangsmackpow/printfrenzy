@@ -109,15 +109,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'read') {
     try {
       const { ids } = await req.json();
-      
-      if (ids && ids.length > 0) {
-        const placeholders = ids.map(() => '?').join(',');
-        await db.prepare(`UPDATE notifications SET read = 1 WHERE id IN (${placeholders}) AND user_email = ?`)
-          .bind(...ids, email).run();
+
+      // Coerce to positive integers (an array of objects/strings would otherwise bind
+      // as junk) and chunk the IN(...) under D1's ~100 bind-parameter cap.
+      const numericIds = Array.isArray(ids)
+        ? Array.from(new Set(ids.map((n: unknown) => Number(n)).filter((n: number) => Number.isInteger(n) && n > 0)))
+        : [];
+
+      if (numericIds.length > 0) {
+        const CHUNK = 50; // id params + the user_email param stay under the bind limit
+        for (let i = 0; i < numericIds.length; i += CHUNK) {
+          const chunk = numericIds.slice(i, i + CHUNK);
+          const placeholders = chunk.map(() => '?').join(',');
+          await db.prepare(`UPDATE notifications SET read = 1 WHERE id IN (${placeholders}) AND user_email = ?`)
+            .bind(...chunk, email).run();
+        }
         await log.info("notifications_marked_read", {
           traceId: generateTraceId(),
           userEmail: email,
-          count: ids.length,
+          count: numericIds.length,
         });
       } else {
         await db.prepare("UPDATE notifications SET read = 1 WHERE user_email = ? AND read = 0")

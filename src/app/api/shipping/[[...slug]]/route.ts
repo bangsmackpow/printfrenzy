@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { getCurrentUser } from "@/utils/session";
 import { log } from "@/utils/logger";
 import { generateTraceId } from "@/utils/trace";
 import { isRateLimited } from "@/utils/rateLimiter";
@@ -11,6 +12,34 @@ async function sanitizeError(e: unknown, context: Record<string, any> = {}): Pro
   const message = e instanceof Error ? e.message : "Unknown error";
   await log.error("Shipping API failure", { traceId, error: message, ...context });
   return NextResponse.json({ error: "Internal server error", traceId }, { status: 500 });
+}
+
+// Atomic claim to serialize concurrent label purchases for the same order.
+// The INSERT is the lock: a PRIMARY KEY conflict means another attempt already
+// holds it, preventing double real-money Shippo charges. Stale claims (crashed
+// worker) are stolen after 90s so an order is never permanently locked out.
+async function tryClaimShipmentLock(db: D1Database, order: string, customer: string): Promise<boolean> {
+  const insert = "INSERT INTO shipment_locks (order_number, customer_name) VALUES (?, ?)";
+  try {
+    await db.prepare(insert).bind(order, customer).run();
+    return true;
+  } catch {
+    try {
+      await db.prepare("DELETE FROM shipment_locks WHERE order_number = ? AND customer_name = ? AND created_at < datetime('now', '-90 seconds')").bind(order, customer).run();
+      await db.prepare(insert).bind(order, customer).run();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+async function releaseShipmentLock(db: D1Database, order: string, customer: string): Promise<void> {
+  try {
+    await db.prepare("DELETE FROM shipment_locks WHERE order_number = ? AND customer_name = ?").bind(order, customer).run();
+  } catch {
+    // best-effort; stale reaper cleans up if this fails
+  }
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug?: string[] }> }) {
@@ -52,9 +81,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   const session = await auth();
   const db = (process.env as unknown as { DB: D1Database }).DB;
 
-  const userEmail = session?.user?.email || "unknown";
-
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  // H5: purchasing a label spends real money — require a live account, not a stale JWT.
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Session expired. Please sign in again." }, { status: 401 });
+  const userEmail = user.email;
 
   if (slug?.[0] === 'rates') {
     if (db) {
@@ -193,7 +224,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
 
   if (slug?.[0] === 'purchase') {
     if (db) {
-      const limited = await isRateLimited(db, req, "purchase_label", 5, 60); // 5 label purchases per 60s
+      const limited = await isRateLimited(db, req, "purchase_label", 5, 60, true); // 5 label purchases per 60s, fail-closed
       if (limited) {
         return NextResponse.json({ error: "Too many label purchase attempts. Please wait a minute." }, { status: 429 });
       }
@@ -224,47 +255,58 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
         await log.warn("Duplicate label check failed, proceeding anyway", { user: userEmail, order: finalOrderNumber, error: e instanceof Error ? e.message : String(e) });
       }
 
-      await log.info("Purchasing shipping label", { user: userEmail, order: finalOrderNumber, rate_id });
-
-      const tRes = await fetch('https://api.goshippo.com/transactions/', {
-        method: 'POST',
-        headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rate: rate_id, label_file_type: "PDF", async: false })
-      });
-      
-      const transaction = await tRes.json() as { status: string; tracking_number: string; label_url: string; messages?: any[] };
-      
-      if (transaction.status !== 'SUCCESS') {
-        await log.error("Shippo purchase failed", { transaction, user: userEmail, order: finalOrderNumber });
-        return NextResponse.json({ error: "Failed to purchase shipping label" }, { status: 400 });
+      // ATOMIC CLAIM: serialize concurrent purchases for this order so a double-submit
+      // (or a momentarily bypassed rate limiter) cannot trigger two real-money charges.
+      if (!(await tryClaimShipmentLock(db, finalOrderNumber, finalCustomerName))) {
+        await log.warn("Concurrent label purchase in progress, rejecting", { user: userEmail, order: finalOrderNumber });
+        return NextResponse.json({ error: "A label purchase for this order is already in progress. Please wait a moment." }, { status: 409 });
       }
 
-      // If we got here, Shippo has CHARGED the user. We MUST try our best to return the label even if DB fails.
       try {
-        const shipmentId = crypto.randomUUID();
-        await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(shipmentId, finalOrderNumber, finalCustomerName, finalStreet, finalCity, finalState, finalZip, transaction.tracking_number, transaction.label_url).run();
+        await log.info("Purchasing shipping label", { user: userEmail, order: finalOrderNumber, rate_id });
 
-        // FIX: Removed hardcoded values from bind that were already in the SQL string
-        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'SHIPMENT_CREATED', 'Shipping label purchased', ?)")
-          .bind(null, finalOrderNumber, userEmail, JSON.stringify({
-            tracking_number: transaction.tracking_number,
-            destination: `${finalCustomerName}, ${finalStreet}, ${finalCity}, ${finalState} ${finalZip}`,
-            label_url: transaction.label_url
-          })).run();
-          
-        await log.info("Label purchased and recorded successfully", { user: userEmail, order: finalOrderNumber, tracking: transaction.tracking_number });
-      } catch (dbError) {
-        // Log the DB failure but STILL return the label to the user so they can print it
-        await log.error("Post-purchase database recording failed", { 
-          error: dbError instanceof Error ? dbError.message : String(dbError), 
-          order: finalOrderNumber,
-          tracking: transaction.tracking_number,
-          label: transaction.label_url
+        const tRes = await fetch('https://api.goshippo.com/transactions/', {
+          method: 'POST',
+          headers: { 'Authorization': `ShippoToken ${SHIPPO_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rate: rate_id, label_file_type: "PDF", async: false })
         });
-      }
 
-      return NextResponse.json({ success: true, tracking_number: transaction.tracking_number, label_url: transaction.label_url });
+        const transaction = await tRes.json() as { status: string; tracking_number: string; label_url: string; messages?: any[] };
+
+        if (transaction.status !== 'SUCCESS') {
+          await log.error("Shippo purchase failed", { transaction, user: userEmail, order: finalOrderNumber });
+          return NextResponse.json({ error: "Failed to purchase shipping label" }, { status: 400 });
+        }
+
+        // If we got here, Shippo has CHARGED the user. We MUST try our best to return the label even if DB fails.
+        try {
+          const shipmentId = crypto.randomUUID();
+          await db.prepare("INSERT INTO shipments (id, order_number, customer_name, street, city, state, zip, tracking_number, label_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(shipmentId, finalOrderNumber, finalCustomerName, finalStreet, finalCity, finalState, finalZip, transaction.tracking_number, transaction.label_url).run();
+
+          // FIX: Removed hardcoded values from bind that were already in the SQL string
+          await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'SHIPMENT_CREATED', 'Shipping label purchased', ?)")
+            .bind(null, finalOrderNumber, userEmail, JSON.stringify({
+              tracking_number: transaction.tracking_number,
+              destination: `${finalCustomerName}, ${finalStreet}, ${finalCity}, ${finalState} ${finalZip}`,
+              label_url: transaction.label_url
+            })).run();
+
+          await log.info("Label purchased and recorded successfully", { user: userEmail, order: finalOrderNumber, tracking: transaction.tracking_number });
+        } catch (dbError) {
+          // Log the DB failure but STILL return the label to the user so they can print it
+          await log.error("Post-purchase database recording failed", {
+            error: dbError instanceof Error ? dbError.message : String(dbError),
+            order: finalOrderNumber,
+            tracking: transaction.tracking_number,
+            label: transaction.label_url
+          });
+        }
+
+        return NextResponse.json({ success: true, tracking_number: transaction.tracking_number, label_url: transaction.label_url });
+      } finally {
+        await releaseShipmentLock(db, finalOrderNumber, finalCustomerName);
+      }
     } catch (e: unknown) { return sanitizeError(e, { user: userEmail }); }
   }
 

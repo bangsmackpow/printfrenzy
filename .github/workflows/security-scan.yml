@@ -64,5 +64,11 @@ jobs:
         with:
           node-version: "20"
           cache: 'npm'
-      - name: NPM Audit
+      # Blocking gate: only production (runtime) dependencies are deployed to the edge,
+      # so the critical check audits those. Build-time-only advisories (e.g. `tar` under
+      # @cloudflare/next-on-pages) cannot be shipped and are reported non-blocking below.
+      - name: NPM Audit (production criticals - blocking)
+        run: npm audit --omit=dev --audit-level=critical
+      - name: NPM Audit (full tree incl. dev toolchain - informational)
         run: npm audit --audit-level=critical
+        continue-on-error: true

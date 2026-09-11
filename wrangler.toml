@@ -6,7 +6,7 @@ pages_build_output_dir = ".vercel/output/static"
 # `wrangler pages deploy` script is an alternative manual path.
 
 compatibility_flags = [ "nodejs_compat" ]
-compatibility_date = "2024-11-18" # Use a very recent date
+compatibility_date = "2026-09-11" # Keep current; see https://developers.cloudflare.com/workers/configuration/compatibility-dates/
 
 [[d1_databases]]
 binding = "DB"

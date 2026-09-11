@@ -4,7 +4,7 @@
 
 DTF print queue & production management system. Handles order ingestion (Wix sync, CSV import, manual entry), print queue management with stage-based workflow, shipping label purchasing via Shippo, and production tracking.
 
-**Tech Stack**: Next.js 16.2.6 + Cloudflare Pages + D1 (SQLite) + R2 + Tailwind CSS
+**Tech Stack**: Next.js 16.3.5 + Cloudflare Pages + D1 (SQLite) + R2 + Tailwind CSS
 
 ## Architecture Decisions
 
@@ -23,7 +23,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - Shipping: Address validation via Shippo API before rate fetching — rejects invalid addresses, auto-corrects when USPS provides fixes
 - Bulk status cap: 500 orders max per operation
 - CSV limits: 5MB / 10k records max
-- CI: `npm audit --audit-level=critical` (dev deps cause false positives at `--audit-level=high`)
+- CI: blocking `npm audit --omit=dev --audit-level=critical` (audits only the runtime deps that actually deploy to the edge). A separate non-blocking full-tree `npm audit --audit-level=critical` surfaces dev-toolchain advisories (e.g. `tar` under the deprecated `@cloudflare/next-on-pages`) without failing the build.
 
 ## UI Conventions
 
@@ -64,6 +64,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 27. **CSV Import Review & Select**: The `/import` page now offers two side-by-side modes — **Quick Import** (original blind upload, unchanged) and **Review & Select** (preview every line item with per-item checkboxes, skip duplicates already in the queue, import only what's checked). One import submission = ONE batch card (the batch name becomes `order_number`, the display name in the queue). Dedup uses an exact line-item key (order_number + customer + product + variant + quantity, case-insensitive) against both `order_number` and the new `source_order_number` column (which preserves the original Wix order number for future dedup). Added `POST /api/orders/import/preview` (parse + flag duplicates) and `POST /api/orders/import/select` (JSON batch insert with server-side re-dedup, chunked 100/batch). Rows without a valid image are now importable (null `image_url`). Requires migration `0002_orders_source_order_number.sql`.
 28. **Client-Side Telemetry**: Client errors are now captured in Axiom, not just the browser console. `src/utils/clientLogger.ts` buffers events and POSTs them (fire-and-forget, `keepalive`) to the new session-protected `POST /api/telemetry` route, which forwards them through the existing logger with the user's email. All client `console.error` calls in pages/components route through it. Login logs (`src/auth.ts`) now include source `ip` + `userAgent` (from `x-forwarded-for`/`cf-connecting-ip`).
 29. **Auto-Growing Order Form Textareas**: The single-line **Size / Variant** input on the Edit Order and New Order pages is now a wrapping, auto-resizing `<textarea>` (`src/components/AutoGrowTextarea.tsx`) so long values (e.g. jersey `NAME ON BACK:: / NUMBER::` options) display fully without sideways scrolling. The same auto-grow treatment was applied to **Personalization / Prints Name** and **Production Notes** on both pages. Reusable component; no backend changes.
+30. **P1 Security & Correctness + Cloudflare-Aligned Upgrade**: Cloudflare-MCP audit drove fixes — hardened D1 rate limiter (`INSERT OR IGNORE` + `failClosed` for login/purchase), chunked `IN(...)` in `bulk-status` and `notifications/read` under D1's ~100-bind cap, rewrote System Clear as one ordered `db.batch` (nulls `audit_logs.order_id` first — D1 enforces FK by default and PRAGMA is a no-op in a batch), added `src/utils/session.ts` `getCurrentUser()` for live-role re-validation on admin/orders/shipping-purchase (instant revocation), added `shipment_locks` (migration `0003`) for an atomic label-purchase claim (no double-charge), and made upload magic-byte validation fail-closed (`%PDF` sig, webp tag at offset 8). Upgraded `next`→16.3.5 and `next-auth`→beta.32 (`@auth/core` 0.41.3) clearing Auth.js fail-open + Next middleware-bypass criticals; bumped `compatibility_date`; fixed the stale `--minify` flag in `pages:build`. CI critical gate now audits production deps. See `STATUS.md` #33.
 
 ### Pending / Future
 - Email notifications for critical stage transitions
@@ -111,11 +112,13 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `src/utils/trace.ts` — Trace ID generation
 - `src/utils/wixUtils.ts` — image URL transformation
 - `src/utils/config.ts` — centralized R2 public URL
-- `src/utils/rateLimiter.ts` — D1-backed rate limiter (per-requester cleanup)
+- `src/utils/rateLimiter.ts` — D1-backed rate limiter (per-requester cleanup, `INSERT OR IGNORE`, `failClosed` option for auth-sensitive endpoints)
+- `src/utils/session.ts` — `getCurrentUser()` re-validates the session against D1 (live role + instant revocation on delete/demote)
 
 ### Database & Migrations
 - `schema.sql` — canonical idempotent schema + all indexes
-- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`, `0002_orders_source_order_number.sql`)
+- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`, `0002_orders_source_order_number.sql`, `0003_shipment_locks.sql`)
+- **D1 foreign keys**: D1 enforces FK constraints by default and `PRAGMA foreign_keys` is a no-op inside a `db.batch`/transaction — to delete parent rows referenced by `audit_logs.order_id`, either delete/null the child rows first or null the link inside an ordered `db.batch` (do NOT rely on a PRAGMA toggle).
 - **Indexes**: all hot query paths are indexed (`orders(status/order_number/created_at)`, `audit_logs(action_type/user_email/timestamp/order_id)`, `shipments(order_number)`, `notifications(user_email,read,timestamp)`, `rate_limits(timestamp)`). Verify changes with `EXPLAIN QUERY PLAN` before/after.
 - **FTS5**: `orders_fts` virtual table + triggers (INSERT/UPDATE/DELETE) keep full-text search in sync. `/api/search` uses `MATCH`. If you change `orders` columns, update `migrations/0001_orders_fts.sql` and re-run it (idempotent). The `source_order_number` dedup column does not need to be in FTS.
 - **CSV Import Dedup**: the dedup key is `order_number|source_order_number + customer_name + product_name + variant + quantity` compared case-insensitively. The original Wix order number is stored in `source_order_number` so future exports of the same orders are flagged as already imported even after the batch name replaces `order_number`.

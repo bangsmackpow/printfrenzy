@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isRateLimited } from "@/utils/rateLimiter";
 
+// Next 16.3.5: 'edge' is rejected for middleware ("use experimental-edge"); Pages/Workers
+// requires the edge runtime, so this stays experimental-edge despite the generic deprecation warning.
 export const runtime = "experimental-edge";
 
 export default async function proxy(request: NextRequest) {
@@ -13,7 +15,7 @@ export default async function proxy(request: NextRequest) {
   if (isCredentialsLogin) {
     const db = (process.env as unknown as { DB: D1Database }).DB;
     if (db) {
-      const limited = await isRateLimited(db, request, "login", 5, 60); // 5 attempts per 60s
+      const limited = await isRateLimited(db, request, "login", 5, 60, true); // 5 attempts per 60s, fail-closed
       if (limited) {
         return new NextResponse(JSON.stringify({ error: "Too many login attempts. Please try again in a minute." }), {
           status: 429,

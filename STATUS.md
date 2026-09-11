@@ -1,5 +1,21 @@
 # Project Status - PrintFrenzy
 
+### 33. 🔒 P1 Security & Correctness Pass + Cloudflare-aligned Upgrade (Live)
+Audited against current Cloudflare Workers/D1/Pages best practices (via the Cloudflare MCP) and fixed the P1 findings. All runtime-agnostic (Pages/next-on-pages unaffected).
+- **Rate limiter hardened (C1)**: `INSERT OR IGNORE` (kills the concurrent same-second PK-collision that aborted the batch and let the limiter fail open), plus a `failClosed` option now used for `login` and `purchase_label` so a D1 error blocks rather than admits brute force.
+- **Bulk + notification reads no longer break at ~100 ids (H2/M11)**: `bulk-status` and `notifications/read` now dedupe + chunk their `IN(...)` under D1's ~100 bind-param cap.
+- **System Clear fixed (H4)**: D1 enforces foreign keys by default and `PRAGMA foreign_keys` is a no-op inside a batch, so the old `DELETE FROM orders` hit `FOREIGN KEY constraint failed`. Now one ordered `db.batch` nulls `audit_logs.order_id` first (history preserved via the audit LEFT JOIN) then clears shipments+orders atomically.
+- **Instant auth revocation (H5)**: new `src/utils/session.ts` `getCurrentUser()` re-reads the live `role` from D1 on every authed request; swapped into admin GET/POST/DELETE, orders POST/DELETE, and the real-money label purchase — deleted/demoted users lose access immediately instead of at JWT expiry.
+- **Double-charge guard (H3)**: new `shipment_locks` table (migration `0003`) makes label purchase atomic — the INSERT is the claim, Shippo is called only if the claim wins, released in `finally`, stale claims reclaimed after 90s.
+- **Upload validation fail-closed (M2)**: added the `%PDF` magic signature, fixed webp to match `"WEBP"` at offset 8 (was checking offset 0 so any RIFF/WAV passed), and unknown signed-whitelist types are now rejected instead of accepted.
+- **Cloudflare-aligned upgrade**: `next` 16.2.6 → **16.3.5**, `next-auth` beta.31 → **beta.32** (resolves `@auth/core` to 0.41.3, clearing the Auth.js *fail-open existence check* + *email homoglyph* + *middleware-bypass* criticals). `npm run build` passes on 16.3.5; `wrangler.toml` `compatibility_date` bumped to `2026-09-11`.
+- **Deploy script fixed**: `pages:build` had a stale `--minify` flag (never valid for next-on-pages 1.13.16 — minification is on by default) that broke the build; removed.
+- **CI audit gate**: the blocking critical check now audits **production deps only** (`--omit=dev`) since that's what ships to the edge; the full-tree audit (incl. the dev-only `tar`/vercel toolchain advisory) is retained as a non-blocking informational step.
+- Verified: `tsc --noEmit` clean, ESLint unchanged (0 new errors), `next build` green, `0003` applied to remote D1 with the claim query confirmed index-served.
+- **Known (deferred)**: `@cloudflare/next-on-pages` is deprecated (Cloudflare now recommends vinext/OpenNext on Workers) — intentionally staying on Pages. `middleware`→`proxy` + Edge-runtime deprecation warnings on Next 16.3.5 are accepted (edge is required for Pages). The next-on-pages Vercel build step can't run on native Windows (`spawn bash ENOENT`) — it builds in Cloudflare Pages CI (Linux).
+
+---
+
 ### 32. 🧱 Auto-Growing Order Form Textareas (Live)
 - **Size/Variant Wraps & Grows**: The single-line Size/Variant input on `/orders/[id]/edit` and `/orders/new` is now a wrapping, auto-resizing textarea via the new reusable `src/components/AutoGrowTextarea.tsx`. Long values (e.g. jersey `NAME ON BACK::` / `NUMBER::` options) wrap and the box height grows to fit all text — no sideways scrolling.
 - **Consistent Treatment**: Personalization / Prints Name and Production Notes on both pages now use the same auto-grow component (they were fixed-height textareas that scrolled vertically).
