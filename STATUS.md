@@ -1,5 +1,13 @@
 # Project Status - PrintFrenzy
 
+### 34. 🔍 Zoomable Item Detail View (Live)
+- **Explode Button on Every Queue Card**: A circular magnifier FAB in the lower-right of each item's artwork (all stages, always visible for touch/tablet) opens a read-only "exploded" detail modal for that single item.
+- **Left Pane — Zoomable Artwork**: Scroll-wheel zoom (100–500%), double-click toggle, drag-to-pan when zoomed, +/−/Reset controls with live zoom %, and a thumbnail strip for all 4 images with arrow-key navigation (Escape/backdrop closes).
+- **Right Pane — Full Order Record**: Customer, Product, Size/Variant, Quantity, Personalization, Production Notes, Stage (color badge), and Date Added — nothing editable.
+- **Live & Self-Healing**: The modal reads the item from polling state by id, so stage changes appear live; it remounts per item (resets zoom) and auto-closes if the item is deleted elsewhere. `src/components/ItemDetailModal.tsx`, zero API/schema changes (`/api/orders` already returns every field).
+
+---
+
 ### 33. 🔒 P1 Security & Correctness Pass (Cloudflare-MCP audit) (Live)
 Audited against current Cloudflare Workers/D1/Pages best practices (via the Cloudflare MCP) and fixed the P1 findings. All runtime-agnostic (Pages/next-on-pages unaffected).
 - **Rate limiter hardened (C1)**: `INSERT OR IGNORE` (kills the concurrent same-second PK-collision that aborted the batch and let the limiter fail open), plus a `failClosed` option now used for `login` and `purchase_label` so a D1 error blocks rather than admits brute force.

@@ -84,6 +84,7 @@ Protecting the production data and team access:
 - **Client-Side Telemetry**: Browser errors (dashboard polls, imports, note saves, search, uploads, label purchase) are buffered and streamed to Axiom via `/api/telemetry`, tagged with the user's email. Login logs now include source IP and user-agent.
 - **Auto-Growing Order Form Textareas**: Size/Variant, Personalization, and Production Notes fields on the Edit and New Order pages wrap and auto-resize so long values are fully viewable without sideways scrolling.
 - **P1 Security & Correctness Pass (Cloudflare-MCP audit)**: hardened the D1 rate limiter, chunked bulk/notification `IN()` queries under D1's bind-param cap, made System Clear an ordered FK-safe batch, added `getCurrentUser()` live-role revocation, added an atomic `shipment_locks` double-charge guard (migration `0003`), and made upload magic-byte validation fail-closed. See `STATUS.md` #33.
+- **Zoomable Item Detail View**: a circular explode button on every queue card (all stages) opens a read-only detail modal — zoomable/pannable artwork with a 4-image thumbnail strip on the left, full order record (customer, product, size, quantity, personalization, notes, stage, date) on the right. See `STATUS.md` #34.
 
 ⏳ **In Progress / Next Phase**:
 - **Migrate off `@cloudflare/next-on-pages`** to OpenNext / vinext on Workers — the current builder is deprecated, peer-caps Next at ≤15.5.2, and cannot build patched `next`/`@auth/core` (see Known Constraints). This is the prerequisite for clearing the allowlisted criticals.
