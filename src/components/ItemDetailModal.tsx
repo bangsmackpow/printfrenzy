@@ -35,7 +35,7 @@ function DetailRow({ label, value, multiline = false }: { label: string; value?:
 
 export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
     const images = [item.image_url, item.image_url2, item.image_url3, item.image_url4]
-    .filter((img): img is string => img !== undefined && !img.includes('r2.dev/placeholder.svg'));
+    .filter((img): img is string => typeof img === 'string' && img.length > 0 && !img.includes('r2.dev/placeholder.svg'));
 
   const [currentImage, setCurrentImage] = useState(0);
   const [scale, setScale] = useState(1);
