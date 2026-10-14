@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { getPrinterQualityImage } from '@/utils/wixUtils';
 import type { Order } from '@/app/dashboard/page';
+import { PriorityControl } from '@/components/PriorityControl';
 
 interface ItemDetailModalProps {
   item: Order;
   onClose: () => void;
+  onPriorityChange?: (update: { is_priority: boolean; priority_note: string }) => void;
 }
 
 const MIN_SCALE = 1;
@@ -33,7 +35,7 @@ function DetailRow({ label, value, multiline = false }: { label: string; value?:
   );
 }
 
-export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
+export function ItemDetailModal({ item, onClose, onPriorityChange }: ItemDetailModalProps) {
     const images = [item.image_url, item.image_url2, item.image_url3, item.image_url4]
     .filter((img): img is string => typeof img === 'string' && img.length > 0 && !img.includes('r2.dev/placeholder.svg'));
 
@@ -197,6 +199,16 @@ export function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
           {/* Details */}
           <div className="p-8 overflow-y-auto">
             <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-600 mb-4">Item Details</p>
+            <PriorityControl
+              scope="item"
+              id={item.id}
+              active={item.is_priority}
+              by={item.priority_by}
+              at={item.priority_at}
+              note={item.priority_note}
+              onChange={onPriorityChange}
+              className="mb-6"
+            />
             <DetailRow label="Customer Name" value={item.customer_name} />
             <DetailRow label="Product" value={item.product_name} />
             <DetailRow label="Size / Variant" value={item.variant || 'Standard'} multiline />

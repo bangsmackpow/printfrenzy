@@ -6,6 +6,7 @@ import { getPrinterQualityImage } from '@/utils/wixUtils';
 import { logClient } from '@/utils/clientLogger';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
+import { PriorityControl } from '@/components/PriorityControl';
 
 interface Order {
   id: string;
@@ -19,6 +20,14 @@ interface Order {
   created_at: string;
   notes?: string;
   print_name?: string;
+  is_priority?: number;
+  priority_by?: string;
+  priority_at?: string;
+  priority_note?: string;
+  batch_is_priority?: number;
+  batch_priority_by?: string;
+  batch_priority_at?: string;
+  batch_priority_note?: string;
 }
 
 type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'STAGING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
@@ -333,6 +342,14 @@ function DetailContent() {
     }
   };
 
+  const handleItemPriorityChange = (id: string, update: { is_priority: boolean; priority_note: string }) => {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, is_priority: update.is_priority ? 1 : 0, priority_note: update.priority_note } : it));
+  };
+
+  const handleBatchPriorityChange = (update: { is_priority: boolean; priority_note: string }) => {
+    setItems(prev => prev.map(it => ({ ...it, batch_is_priority: update.is_priority ? 1 : 0, batch_priority_note: update.priority_note })));
+  };
+
   const deleteItem = async (id: string) => {
     if (!confirm("Are you sure you want to delete this part?")) return;
     try {
@@ -357,6 +374,11 @@ function DetailContent() {
     return acc;
   }, {} as Record<string, Order[]>);
 
+  // Priority items float to the top within each customer group.
+  for (const key of Object.keys(groupedByCustomer)) {
+    groupedByCustomer[key].sort((a, b) => (b.is_priority ? 1 : 0) - (a.is_priority ? 1 : 0));
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-8 md:p-16">
       <div className="max-w-6xl mx-auto">
@@ -371,7 +393,19 @@ function DetailContent() {
             <h1 className="text-6xl font-black text-blue-600 tracking-tighter italic uppercase">Batch: {orderNumber}</h1>
           </div>
 
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50 flex-grow max-w-md w-full">
+          <div className="flex flex-col gap-4 flex-grow max-w-md w-full">
+            <PriorityControl
+              scope="batch"
+              orderNumber={orderNumber || undefined}
+              active={items[0]?.batch_is_priority}
+              by={items[0]?.batch_priority_by}
+              at={items[0]?.batch_priority_at}
+              note={items[0]?.batch_priority_note}
+              label="Batch Priority"
+              placeholder="Why is this entire batch priority? Add context for the team..."
+              onChange={handleBatchPriorityChange}
+            />
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-200/50">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 block">Global Batch Note (Overwrites All Items)</label>
               <textarea 
                 value={batchNote} 
@@ -384,6 +418,7 @@ function DetailContent() {
                   <p className="text-[8px] font-bold text-slate-400 uppercase italic">Careful: Saving this replaces all individual part notes</p>
                   <button onClick={saveBatchNote} className="px-3 py-1 bg-red-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all">Save Global</button>
               </div>
+          </div>
           </div>
         </header>
 
@@ -446,6 +481,18 @@ function DetailContent() {
 
                       {/* Print Name Input */}
                       <div className="mt-6">
+                          <PriorityControl
+                            scope="item"
+                            id={row.id}
+                            active={row.is_priority}
+                            by={row.priority_by}
+                            at={row.priority_at}
+                            note={row.priority_note}
+                            label="Item Priority"
+                            placeholder="Why is this part priority? Add context..."
+                            onChange={(u) => handleItemPriorityChange(row.id, u)}
+                            className="mb-5"
+                          />
                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Personalization / Prints Name</label>
                           <textarea
                             defaultValue={row.print_name || ""}

@@ -14,6 +14,10 @@ CREATE TABLE IF NOT EXISTS orders (
     quantity INTEGER DEFAULT 1,
     notes TEXT,
     print_name TEXT,
+    is_priority INTEGER DEFAULT 0,
+    priority_by TEXT,
+    priority_at DATETIME,
+    priority_note TEXT,
     ordered_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -62,6 +66,17 @@ CREATE TABLE IF NOT EXISTS shipment_locks (
     PRIMARY KEY (order_number, customer_name)
 );
 
+-- Batch-level priority flag. One row per order_number; independent of the
+-- per-item priority columns on orders. A batch is priority if this row says so
+-- OR any of its items is priority.
+CREATE TABLE IF NOT EXISTS batch_priorities (
+    order_number TEXT PRIMARY KEY,
+    is_priority INTEGER DEFAULT 0,
+    priority_by TEXT,
+    priority_at DATETIME,
+    priority_note TEXT
+);
+
 CREATE TABLE IF NOT EXISTS notification_subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_email TEXT NOT NULL,
@@ -89,6 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_notifications_poll ON notifications (user_email, 
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders (order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_is_priority ON orders (is_priority);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs (action_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_email ON audit_logs (user_email);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);

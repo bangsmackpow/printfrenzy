@@ -24,6 +24,7 @@ const ACTION_TYPE_CONFIG: Record<string, { label: string; color: string; bgColor
   ORDER_DELETE: { label: 'Order Delete', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-100' },
   SYSTEM_CLEAR: { label: 'System Clear', color: 'text-orange-700', bgColor: 'bg-orange-50', borderColor: 'border-orange-100' },
   SHIPMENT_CREATED: { label: 'Label Purchase', color: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-100' },
+  PRIORITY_CHANGE: { label: 'Priority', color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-100' },
 };
 
 export default function AuditAdmin() {
@@ -138,6 +139,13 @@ export default function AuditAdmin() {
                         <p className="font-black text-slate-900 text-xs">System Clears</p>
                     </button>
                     <button 
+                        onClick={() => { setFilterActionType('PRIORITY_CHANGE'); setFilterUser(''); }}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all ${filterActionType === 'PRIORITY_CHANGE' ? 'border-blue-600 bg-blue-50' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
+                    >
+                        <p className="text-[9px] font-black uppercase text-slate-400 mb-1">Triage</p>
+                        <p className="font-black text-slate-900 text-xs">Priority Changes</p>
+                    </button>
+                    <button 
                         onClick={clearFilters}
                         className="p-4 rounded-2xl border-2 border-slate-900 bg-slate-900 text-left hover:bg-blue-600 hover:border-blue-600 transition-all group"
                     >
@@ -243,6 +251,8 @@ export default function AuditAdmin() {
                       } else if (log.action_type === 'SHIPMENT_CREATED') {
                         detailsText = details.tracking_number || 'Label purchased';
                         detailsExtra = details.destination;
+                      } else if (log.action_type === 'PRIORITY_CHANGE') {
+                        detailsText = `${details.is_priority ? 'Set' : 'Cleared'}${details.scope ? ` \u00b7 ${details.scope === 'batch' ? 'whole batch' : 'single item'}` : ''}`;
                       } else {
                         detailsText = log.action;
                       }
@@ -275,7 +285,7 @@ export default function AuditAdmin() {
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        {log.order_id ? (
+                        {log.order_id || log.order_number ? (
                           <div className="flex flex-col">
                             <span className="font-black text-slate-900 text-sm">#{log.order_number || 'Manual'}</span>
                             <span className="text-xs font-bold text-slate-400 capitalize">{log.customer_name}</span>

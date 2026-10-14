@@ -1,5 +1,16 @@
 # Project Status - PrintFrenzy
 
+### 35. 🚩 Priority Tagging — Item & Batch (Live)
+- **Two Independent Scopes**: A PRIORITY flag can be set on a single line item (new `orders` columns `is_priority`, `priority_by`, `priority_at`, `priority_note`) or on an entire batch / `order_number` (new `batch_priorities` table) — so "whole batch is priority" is decoupled from item flags and each carries one canonical who/why. A batch counts as priority if its batch flag is set OR any of its items is priority. Any authenticated user may flag priority (live-account checked via `getCurrentUser()`).
+- **Visual Marker + Hover + Click-to-Note**: An amber flag badge (`src/components/PriorityBadge.tsx`) marks priority items and batches. Hovering shows who marked it and when (plus the note); clicking opens the note area — for an item, the `ItemDetailModal`; for a batch, the `/orders/details` batch note.
+- **Queue Ordering**: Priority batches float to the top of each stage and priority items float to the top within a batch / customer group (stable sort, `created_at` preserved for ties). Dashboard `orderedGroups` + details-page customer groups.
+- **Dedicated Priority Note**: Never clobbers production notes. Editable in `ItemDetailModal`, `/orders/details` (per-item + batch), `/orders/[id]/edit`, and `/orders/new` via the reusable `src/components/PriorityControl.tsx`; dashboard cards get per-item toggles and the batch header gets a batch toggle.
+- **API & Data**: New `POST /api/orders/priority` (`scope: 'item' | 'batch'`; note preserved when omitted; sets `priority_by`/`priority_at` on set, nulls them on clear). `GET /api/orders` and `GET /api/orders/details` LEFT JOIN `batch_priorities` to return `batch_is_priority*`. `manual` + `update` accept `is_priority`/`priority_note`. Whole-batch delete purges the `batch_priorities` row (single-item delete does not). Writes `PRIORITY_CHANGE` to `audit_logs` (new amber badge + "Priority Changes" quick filter on `/admin/audit`).
+- **Migration**: `0004_priority.sql` (adds the four `orders` columns, creates `batch_priorities`, indexes `orders.is_priority`); also folded into canonical `schema.sql`. FTS unaffected.
+- Verified: `tsc --noEmit` clean, no new ESLint errors.
+
+---
+
 ### 34. 🔍 Zoomable Item Detail View (Live)
 - **Explode Button on Every Queue Card**: A circular magnifier FAB in the lower-right of each item's artwork (all stages, always visible for touch/tablet) opens a read-only "exploded" detail modal for that single item.
 - **Left Pane — Zoomable Artwork**: Scroll-wheel zoom (100–500%), double-click toggle, drag-to-pan when zoomed, +/−/Reset controls with live zoom %, and a thumbnail strip for all 4 images with arrow-key navigation (Escape/backdrop closes).

@@ -15,7 +15,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - **SQL**: Parameterized queries exclusively — no string interpolation
 - **Observability**: High-signal event streaming to Axiom via `src/utils/logger.ts`.
 - **Auth freshness**: `getCurrentUser()` (`src/utils/session.ts`) re-reads role from D1 on every privileged request (admin/orders/shipping-purchase) — JWT role is a hint only; deleted/demoted accounts are revoked immediately. Adds one indexed `users.email` read per authed request (accepted).
-- **Hosting / framework pinning**: Deployed on Cloudflare Pages via the **deprecated `@cloudflare/next-on-pages`** (build command `npx @cloudflare/next-on-pages@1` lives in the Pages project, not `package.json`; bindings + `compatibility_date` also come from the Pages project settings, not `wrangler.toml`). Its peer-caps (`next <=15.5.2`) and bundled `@vercel/next@4.12.4` **cannot build patched Next (≥16.3.x) or `@auth/core` (≥0.41.3)**, so the app is pinned to `next@16.2.6` + `next-auth@5.0.0-beta.31`. The resulting 16 framework/Auth.js criticals (12 Next + 4 Auth.js) are allowlisted (`.github/audit-allowlist.json` + `.github/audit-gate.mjs`) — incl. GHSA-vcvr-r3jv-pc5j, a `next/og` `ImageResponse` RCE that is unreachable here (no `next/og` import, no OG routes; re-check if either is ever added). **Do not bump `next`/`next-auth` without migrating off next-on-pages first** — the Pages build will fail.
+- **Hosting / framework pinning**: Deployed on Cloudflare Pages via the **deprecated `@cloudflare/next-on-pages`** (build command `npx @cloudflare/next-on-pages@1` lives in the Pages project, not `package.json`; bindings + `compatibility_date` also come from the Pages project settings, not `wrangler.toml`). Its peer-caps (`next <=15.5.2`) and bundled `@vercel/next@4.12.4` **cannot build patched Next (≥16.3.x) or `@auth/core` (≥0.41.3)**, so the app is pinned to `next@16.2.6` + `next-auth@5.0.0-beta.31`. The resulting 21 framework/Auth.js advisories (17 Next + 4 Auth.js) are allowlisted (`.github/audit-allowlist.json` + `.github/audit-gate.mjs`) — incl. GHSA-vcvr-r3jv-pc5j, a `next/og` `ImageResponse` RCE that is unreachable here (no `next/og` import, no OG routes; re-check if either is ever added). **Do not bump `next`/`next-auth` without migrating off next-on-pages first** — the Pages build will fail.
 
 ## Security Requirements
 
@@ -25,7 +25,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - Shipping: Address validation via Shippo API before rate fetching — rejects invalid addresses, auto-corrects when USPS provides fixes
 - Bulk status cap: 500 orders max per operation
 - CSV limits: 5MB / 10k records max
-- CI: blocking production-deps critical audit via `npm audit --omit=dev --json | node .github/audit-gate.mjs` — fails on any CRITICAL runtime advisory not listed in `.github/audit-allowlist.json` (currently the `next@16.2.6` framework + `@auth/core@0.41.2`/`next-auth@beta.31` Auth.js advisories — 16 total — pinned because `@cloudflare/next-on-pages` cannot build patched versions of either). A separate non-blocking full-tree `npm audit --audit-level=critical` surfaces dev-toolchain advisories (e.g. `tar` under `@cloudflare/next-on-pages`) without failing the build.
+- CI: blocking production-deps critical audit via `npm audit --omit=dev --json | node .github/audit-gate.mjs` — fails on any CRITICAL runtime advisory not listed in `.github/audit-allowlist.json` (currently the `next@16.2.6` framework + `@auth/core@0.41.2`/`next-auth@beta.31` Auth.js advisories — 21 total — pinned because `@cloudflare/next-on-pages` cannot build patched versions of either). A separate non-blocking full-tree `npm audit --audit-level=critical` surfaces dev-toolchain advisories (e.g. `tar` under `@cloudflare/next-on-pages`) without failing the build.
 ## UI Conventions
 
 - Tailwind CSS with `font-black`, uppercase tracking
@@ -68,8 +68,10 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 30. **P1 Security & Correctness + Cloudflare-Aligned Upgrade**: Cloudflare-MCP audit drove fixes — hardened D1 rate limiter (`INSERT OR IGNORE` + `failClosed` for login/purchase), chunked `IN(...)` in `bulk-status` and `notifications/read` under D1's ~100-bind cap, rewrote System Clear as one ordered `db.batch` (nulls `audit_logs.order_id` first — D1 enforces FK by default and PRAGMA is a no-op in a batch), added `src/utils/session.ts` `getCurrentUser()` for live-role re-validation on admin/orders/shipping-purchase (instant revocation), added `shipment_locks` (migration `0003`) for an atomic label-purchase claim (no double-charge), and made upload magic-byte validation fail-closed (`%PDF` sig, webp tag at offset 8). Bumped `compatibility_date` and fixed the stale `--minify` flag in `pages:build`. **Both security bumps BREAK the Cloudflare Pages build** — next→16.3.5 AND next-auth→beta.32/`@auth/core`→0.41.3 each fail the deprecated `@cloudflare/next-on-pages@1.13.16` bundler (peer `next: ">=14.3.0 && <=15.5.2"`; bundled `@vercel/next@4.12.4` rejects Next 16.3 output; `@auth/core` 0.41.3 fails the edge bundle — verified via failing Pages builds 8f049372/00afe73c/7f7aab57 vs the green fc395bb baseline). So the app stays pinned at **`next@16.2.6` + `next-auth@5.0.0-beta.31`** and the resulting 11 Next + 4 Auth.js criticals are allowlisted (`.github/audit-allowlist.json` + `.github/audit-gate.mjs`) with removal condition = migrate off next-on-pages. `H5`'s live-role re-validation (`session.ts`) partially mitigates the Auth.js fail-open advisory. CI critical gate audits production deps with that allowlist applied. See `STATUS.md` #33.
 31. **Zoomable Item Detail View**: A circular magnifier FAB in the lower-right of each queue card's artwork (every stage, always visible for touch/tablet) opens a read-only "exploded" modal for that single item (`src/components/ItemDetailModal.tsx`). Left pane: zoomable/pannable artwork (wheel zoom 100–500%, double-click toggle, drag-to-pan, +/−/Reset, 4-image thumbnail strip, arrow-key nav, Escape/backdrop close). Right pane: full order record — customer, product, size/variant, quantity, personalization, notes, color-coded stage badge, date added — nothing editable. Modal reads the item from polling state by id (live stage updates, auto-closes if deleted) and remounts via `key` per item. Image list filtering is null-safe — D1 `SELECT *` returns `null` (not `undefined`) for empty image columns, so guard with `typeof img === 'string'` before string ops (an `img !== undefined` filter crashed the modal on artwork-less items). Zero API/schema changes (`GET /api/orders` already returns all fields). See `STATUS.md` #34.
 
+32. **Priority Tagging (Item + Batch)**: A PRIORITY flag can be set on a single line item or on a whole batch (an `order_number`). Item-level priority lives in new `orders` columns (`is_priority`, `priority_by`, `priority_at`, `priority_note`); batch-level priority lives in the new `batch_priorities` table (keyed by `order_number`) so the two scopes are independent and a batch carries one canonical "who/why". A batch counts as priority if its batch flag is set OR any of its items is priority. **Visual marker** = amber flag badge (hover shows who marked it and when; clicking opens the note area). **Ordering** = priority batches float to the top of each stage and priority items float to the top within a batch/customer group (stable sort, created_at preserved for ties). **Note area** = dedicated `priority_note` (never clobbers production notes), editable in `ItemDetailModal`, `/orders/details`, `/orders/[id]/edit`, and `/orders/new`; the dashboard has per-item and per-batch toggles. New `POST /api/orders/priority` (`scope: 'item' | 'batch'`) — any authenticated user, live-account checked via `getCurrentUser()`; writes `PRIORITY_CHANGE` to `audit_logs`. `GET /api/orders` and `/api/orders/details` LEFT JOIN `batch_priorities` to return `batch_is_priority*` fields. Whole-batch delete also purges the `batch_priorities` row; single-item delete does not. Requires migration `0004_priority.sql`. See `STATUS.md` #35.
+
 ### Pending / Future
-- **Migrate off `@cloudflare/next-on-pages`** (deprecated; peer-caps Next at 15.5.2, so the app is pinned to an unpatchable `next@16.2.6` + `next-auth@5.0.0-beta.31`, with 16 allowlisted framework/Auth.js criticals). Moving to OpenNext or vinext on **Workers** unblocks patched Next ≥16.3.3 and `@auth/core` ≥0.41.3 and lets the audit allowlist be emptied.
+- **Migrate off `@cloudflare/next-on-pages`** (deprecated; peer-caps Next at 15.5.2, so the app is pinned to an unpatchable `next@16.2.6` + `next-auth@5.0.0-beta.31`, with 21 allowlisted framework/Auth.js advisories). Moving to OpenNext or vinext on **Workers** unblocks patched Next ≥16.3.3 and `@auth/core` ≥0.41.3 and lets the audit allowlist be emptied.
 - Email notifications for critical stage transitions
 - Barcode/QR support on packing slips for scan-based status updates
 - Cloudflare WAF rate-limiting rules (dashboard-level) as an alternative to the D1-backed limiter — note: the Workers `[[ratelimits]]` binding is NOT supported on Cloudflare Pages
@@ -84,7 +86,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `schema.sql` — D1 schema definitions
 
 ### API Routes
-- `src/app/api/orders/[[...slug]]/route.ts` — status, bulk, sync, manual, update, delete, update-item, update-notes, **import (Quick), import/preview, import/select** (with Axiom logging)
+- `src/app/api/orders/[[...slug]]/route.ts` — status, bulk, sync, manual, update, delete, update-item, update-notes, **priority (item/batch)**, **import (Quick), import/preview, import/select** (with Axiom logging)
 - `src/app/api/admin/[[...slug]]/route.ts` — users, audit, stats, clear, password reset, backfill-images
 - `src/app/api/notifications/[[...slug]]/route.ts` — subscribe, poll, mark-read
 - `src/app/api/search/route.ts` — universal search
@@ -108,6 +110,8 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 - `src/components/ImageLightbox.tsx` — multi-image modal with keyboard nav
 - `src/components/ItemDetailModal.tsx` — read-only zoomable item detail modal (exploded view)
 - `src/components/AutoGrowTextarea.tsx` — wrapping, auto-resizing textarea for order forms
+- `src/components/PriorityBadge.tsx` — amber flag marker with who/when/why hover tooltip
+- `src/components/PriorityControl.tsx` — priority toggle + priority-note editor (item/batch), calls `/api/orders/priority`
 
 ### Utilities
 - `src/utils/hashUtils.ts` — PBKDF2 100k iterations
@@ -121,7 +125,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 
 ### Database & Migrations
 - `schema.sql` — canonical idempotent schema + all indexes
-- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`, `0002_orders_source_order_number.sql`, `0003_shipment_locks.sql`)
+- `migrations/` — one-off migrations applied via `wrangler d1 migrations apply` (e.g. `0001_orders_fts.sql`, `0002_orders_source_order_number.sql`, `0003_shipment_locks.sql`, `0004_priority.sql`)
 - **D1 foreign keys**: D1 enforces FK constraints by default and `PRAGMA foreign_keys` is a no-op inside a `db.batch`/transaction — to delete parent rows referenced by `audit_logs.order_id`, either delete/null the child rows first or null the link inside an ordered `db.batch` (do NOT rely on a PRAGMA toggle).
 - **Indexes**: all hot query paths are indexed (`orders(status/order_number/created_at)`, `audit_logs(action_type/user_email/timestamp/order_id)`, `shipments(order_number)`, `notifications(user_email,read,timestamp)`, `rate_limits(timestamp)`). Verify changes with `EXPLAIN QUERY PLAN` before/after.
 - **FTS5**: `orders_fts` virtual table + triggers (INSERT/UPDATE/DELETE) keep full-text search in sync. `/api/search` uses `MATCH`. If you change `orders` columns, update `migrations/0001_orders_fts.sql` and re-run it (idempotent). The `source_order_number` dedup column does not need to be in FTS.
@@ -130,7 +134,7 @@ DTF print queue & production management system. Handles order ingestion (Wix syn
 ### Config & CI
 - `.github/workflows/security-scan.yml` — Gitleaks + Semgrep/Trivy (informational, SARIF uploads skip-if-absent) + the blocking audit below
 - `.github/audit-gate.mjs` — dependency-free production-critical audit gate; reads `npm audit --omit=dev --json`, fails on any critical not allowlisted
-- `.github/audit-allowlist.json` — the 16 pinned `next@16.2.6` + `@auth/core@0.41.2` criticals (removal condition = migrate off next-on-pages)
+- `.github/audit-allowlist.json` — the 21 pinned `next@16.2.6` + `@auth/core@0.41.2` advisories (removal condition = migrate off next-on-pages)
 - `README.md`, `STATUS.md`, `AGENTS.md` — project documentation
 
 ## Workflow Rules

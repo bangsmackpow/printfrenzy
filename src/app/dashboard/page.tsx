@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { ToastNotifications, useNotifications } from '@/components/ToastNotifications';
 import { ImageLightbox } from '@/components/ImageLightbox';
 import { ItemDetailModal } from '@/components/ItemDetailModal';
+import { PriorityBadge } from '@/components/PriorityBadge';
 
 type OrderStatus = 'RECEIVED' | 'ORDERING' | 'PRINTING' | 'STAGING' | 'PRODUCTION' | 'COMPLETED' | 'ARCHIVED';
 
@@ -27,6 +28,14 @@ export interface Order {
   created_at: string;
   notes?: string;
   print_name?: string;
+  is_priority?: number;
+  priority_by?: string;
+  priority_at?: string;
+  priority_note?: string;
+  batch_is_priority?: number;
+  batch_priority_by?: string;
+  batch_priority_at?: string;
+  batch_priority_note?: string;
 }
 
 const STAGES: OrderStatus[] = ['RECEIVED', 'ORDERING', 'PRINTING', 'STAGING', 'PRODUCTION', 'COMPLETED', 'ARCHIVED'];
@@ -210,6 +219,36 @@ function DashboardContent() {
     }
   };
 
+  const toggleItemPriority = async (id: string, next: boolean) => {
+    try {
+      const res = await fetch('/api/orders/priority', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'item', id, is_priority: next }),
+      });
+      if (res.ok) {
+        setItems(prev => prev.map(item => item.id === id ? { ...item, is_priority: next ? 1 : 0 } : item));
+      }
+    } catch (err) {
+      logClient.error('dashboard_item_priority_failed', { id, next, error: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  const toggleBatchPriority = async (orderNumber: string, next: boolean) => {
+    try {
+      const res = await fetch('/api/orders/priority', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'batch', order_number: orderNumber, is_priority: next }),
+      });
+      if (res.ok) {
+        setItems(prev => prev.map(item => item.order_number === orderNumber ? { ...item, batch_is_priority: next ? 1 : 0 } : item));
+      }
+    } catch (err) {
+      logClient.error('dashboard_batch_priority_failed', { orderNumber, next, error: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   const deleteGroup = async (orderNumber: string, itemCount: number) => {
     if (!confirm(`⚠️ This will permanently delete ALL ${itemCount} items in Batch #${orderNumber}.\n\nThis cannot be undone.`)) return;
     try {
@@ -259,6 +298,22 @@ function DashboardContent() {
     acc[item.order_number].push(item);
     return acc;
   }, {} as Record<string, Order[]>);
+
+  // Sort: priority batches float to the top of the stage, and within each batch
+  // priority items float to the top (stable, so created_at ordering is preserved).
+  const isBatchPriority = (rows: Order[]) => rows.some(r => r.is_priority || r.batch_is_priority);
+  const orderedGroups = Object.entries(grouped)
+    .map(([orderNum, rows], index) => ({
+      orderNum,
+      rows: [...rows].sort((a, b) => (b.is_priority ? 1 : 0) - (a.is_priority ? 1 : 0)),
+      index,
+    }))
+    .sort((a, b) => {
+      const ap = isBatchPriority(a.rows) ? 1 : 0;
+      const bp = isBatchPriority(b.rows) ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return a.index - b.index;
+    });
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -404,7 +459,7 @@ function DashboardContent() {
         </div>
       )}
 
-      {Object.keys(grouped).length === 0 ? (
+      {orderedGroups.length === 0 ? (
         <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-32 text-center">
           <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8">
             <svg className="h-10 w-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H4a2 2 0 00-2 2v7m18 0a2 2 0 01-2 2H4a2 2 0 01-2-2m18 0l-2 2H4l-2-2m18-5l-8 8-4-4-6 6" /></svg>
@@ -418,9 +473,13 @@ function DashboardContent() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-16">
-          {Object.entries(grouped).map(([orderNum, items]) => {
+          {orderedGroups.map(({ orderNum, rows: items }) => {
             const groupIds = items.map(i => i.id);
             const isGroupSelected = groupIds.every(id => selectedIds.includes(id));
+            const batchPriority = !!items[0]?.batch_is_priority;
+            const batchPriorityBy = items[0]?.batch_priority_by;
+            const batchPriorityAt = items[0]?.batch_priority_at;
+            const batchPriorityNote = items[0]?.batch_priority_note;
             
             return (
               <section key={orderNum} className="group/section">
@@ -450,6 +509,27 @@ function DashboardContent() {
                   <div className="flex-grow h-[1px] bg-slate-100 group-hover/section:bg-blue-100 transition-colors"></div>
 
                   <div className="flex gap-2">
+                    <button
+                        onClick={() => toggleBatchPriority(orderNum, !batchPriority)}
+                        title={batchPriority ? 'Remove priority from this entire batch' : 'Mark this entire batch as priority'}
+                        className={`px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-sm border flex items-center gap-2 ${
+                            batchPriority ? 'bg-amber-400 border-amber-400 text-amber-950 hover:bg-amber-300' : 'bg-white border-slate-200 text-slate-400 hover:border-amber-200 hover:text-amber-600'
+                        }`}
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" strokeLinecap="round" strokeWidth={2.5} /></svg>
+                        {batchPriority ? 'Batch Priority' : 'Mark Priority'}
+                    </button>
+                    {batchPriority && (
+                      <PriorityBadge
+                        active
+                        by={batchPriorityBy}
+                        at={batchPriorityAt}
+                        note={batchPriorityNote}
+                        showText
+                        onClick={() => router.push(`/orders/details?order_number=${orderNum}`)}
+                        label="Priority"
+                      />
+                    )}
                     <button 
                         onClick={() => router.push(`/orders/details?order_number=${orderNum}`)}
                         className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:border-blue-200 hover:text-blue-600 transition-all shadow-sm"
@@ -530,6 +610,17 @@ function DashboardContent() {
                         })()}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
 
+                        {/* Priority marker (hover for who/why, click for note) */}
+                        <div className="absolute top-4 right-4 z-10">
+                          <PriorityBadge
+                            active={item.is_priority}
+                            by={item.priority_by}
+                            at={item.priority_at}
+                            note={item.priority_note}
+                            onClick={() => setDetailItem(item)}
+                          />
+                        </div>
+
                         {/* Detail View FAB */}
                         <button
                           onClick={(e) => { e.stopPropagation(); setDetailItem(item); }}
@@ -548,7 +639,7 @@ function DashboardContent() {
                             <h3 className="text-lg font-black text-slate-900 leading-tight uppercase italic truncate">{item.product_name}</h3>
                         </div>
 
-                        <div className="flex gap-2 mb-6">
+                        <div className="flex gap-2 mb-4">
                             <span className="bg-slate-900 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest italic">
                                 x{item.quantity}
                             </span>
@@ -556,6 +647,19 @@ function DashboardContent() {
                                 {item.variant || 'Standard'}
                             </span>
                         </div>
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleItemPriority(item.id, !item.is_priority); }}
+                          title={item.is_priority ? 'Remove priority from this item' : 'Mark this item as priority'}
+                          className={`mb-4 w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-1.5 ${
+                            item.is_priority
+                              ? 'bg-amber-400 border-amber-400 text-amber-950'
+                              : 'bg-white border-slate-100 text-slate-400 hover:border-amber-200 hover:text-amber-600'
+                          }`}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" strokeLinecap="round" strokeWidth={2.5} /></svg>
+                          {item.is_priority ? 'Priority Item' : 'Mark Priority'}
+                        </button>
 
                         {((session?.user as { role?: string })?.role === 'ADMIN' || (session?.user as { role?: string })?.role === 'MANAGER') && (
                           <button
@@ -607,7 +711,14 @@ function DashboardContent() {
       {lightboxImages && <ImageLightbox images={lightboxImages} onClose={() => setLightboxImages(null)} />}
       {detailItem && (() => {
         const liveItem = items.find(i => i.id === detailItem.id);
-        return liveItem ? <ItemDetailModal key={liveItem.id} item={liveItem} onClose={() => setDetailItem(null)} /> : null;
+        return liveItem ? (
+          <ItemDetailModal
+            key={liveItem.id}
+            item={liveItem}
+            onClose={() => setDetailItem(null)}
+            onPriorityChange={(u) => setItems(prev => prev.map(i => i.id === liveItem.id ? { ...i, is_priority: u.is_priority ? 1 : 0, priority_note: u.priority_note } : i))}
+          />
+        ) : null;
       })()}
     </div>
   );

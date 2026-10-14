@@ -216,12 +216,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   if (slug?.[0] === 'details') {
     const orderNumber = searchParams.get('order_number');
+    const batchSelect = `o.*, COALESCE(bp.is_priority, 0) AS batch_is_priority, bp.priority_by AS batch_priority_by, bp.priority_at AS batch_priority_at, bp.priority_note AS batch_priority_note`;
+    const batchJoin = `FROM orders o LEFT JOIN batch_priorities bp ON bp.order_number = o.order_number`;
     try {
       if (orderNumber) {
-        const results = await db.prepare("SELECT * FROM orders WHERE order_number = ? ORDER BY customer_name ASC").bind(orderNumber).all();
+        const results = await db.prepare(`SELECT ${batchSelect} ${batchJoin} WHERE o.order_number = ? ORDER BY o.customer_name ASC`).bind(orderNumber).all();
         return NextResponse.json(results.results);
       } else {
-        const results = await db.prepare("SELECT * FROM orders WHERE status = 'PRINTING' ORDER BY order_number DESC, customer_name ASC").all();
+        const results = await db.prepare(`SELECT ${batchSelect} ${batchJoin} WHERE o.status = 'PRINTING' ORDER BY o.order_number DESC, o.customer_name ASC`).all();
         return NextResponse.json(results.results);
       }
     } catch (e: unknown) { return sanitizeError(e, { slug, orderNumber }); }
@@ -237,7 +239,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
 
   try {
-    const results = await db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all();
+    const results = await db.prepare("SELECT o.*, COALESCE(bp.is_priority, 0) AS batch_is_priority, bp.priority_by AS batch_priority_by, bp.priority_at AS batch_priority_at, bp.priority_note AS batch_priority_note FROM orders o LEFT JOIN batch_priorities bp ON bp.order_number = o.order_number ORDER BY o.created_at DESC").all();
     return NextResponse.json(results.results);
   } catch (e: unknown) { return sanitizeError(e, { slug }); }
 }
@@ -557,6 +559,66 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }
   }
 
+  if (slug?.[0] === 'priority') {
+    try {
+      const body = await req.json();
+      const scope = body.scope === 'batch' ? 'batch' : 'item';
+      const isPriority = body.is_priority ? 1 : 0;
+      const hasNote = typeof body.note === 'string';
+
+      // Any authenticated user may flag priority, but the write must still map to a
+      // live account (getCurrentUser re-reads role/email from D1).
+      const actorEmail = user?.email || "unknown";
+
+      if (scope === 'item') {
+        const id = body.id;
+        if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+        const existing = await db.prepare("SELECT order_number, product_name FROM orders WHERE id = ?").bind(id).first() as { order_number: string; product_name: string } | null;
+        if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+        const setClause = isPriority
+          ? "is_priority = 1, priority_by = ?, priority_at = CURRENT_TIMESTAMP"
+          : "is_priority = 0, priority_by = NULL, priority_at = NULL";
+        const noteClause = hasNote ? ", priority_note = ?" : "";
+        const binds: (string | number | null)[] = [
+          ...(isPriority ? [actorEmail] : []),
+          ...(hasNote ? [body.note as string] : []),
+          id,
+        ];
+        await db.prepare(`UPDATE orders SET ${setClause}${noteClause} WHERE id = ?`).bind(...binds).run();
+
+        await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'PRIORITY_CHANGE', ?, ?)")
+          .bind(id, existing.order_number, actorEmail, isPriority ? `Priority set on ${existing.product_name}` : `Priority cleared on ${existing.product_name}`, JSON.stringify({ scope: 'item', is_priority: !!isPriority })).run();
+
+        await log.info("priority_changed", { traceId: generateTraceId(), userEmail: actorEmail, scope: 'item', isPriority: !!isPriority, orderId: id, orderNumber: existing.order_number });
+        return NextResponse.json({ success: true });
+      }
+
+      // scope === 'batch'
+      const orderNumber = typeof body.order_number === 'string' ? body.order_number : null;
+      if (!orderNumber) return NextResponse.json({ error: "Missing order_number" }, { status: 400 });
+
+      const priorityAt = isPriority ? "CURRENT_TIMESTAMP" : "NULL";
+      const noteValue = hasNote ? "?" : "NULL";
+      const batchBinds: (string | number | null)[] = [
+        orderNumber,
+        isPriority,
+        isPriority ? actorEmail : null,
+        ...(hasNote ? [body.note as string] : []),
+      ];
+      await db.prepare(
+        `INSERT INTO batch_priorities (order_number, is_priority, priority_by, priority_at, priority_note) VALUES (?, ?, ?, ${priorityAt}, ${noteValue}) ON CONFLICT(order_number) DO UPDATE SET is_priority = excluded.is_priority, priority_by = excluded.priority_by, priority_at = excluded.priority_at${hasNote ? ", priority_note = excluded.priority_note" : ""}`
+      ).bind(...batchBinds).run();
+
+      await db.prepare("INSERT INTO audit_logs (order_id, order_number, user_email, action_type, action, details) VALUES (?, ?, ?, 'PRIORITY_CHANGE', ?, ?)")
+        .bind(null, orderNumber, actorEmail, isPriority ? "Batch priority set" : "Batch priority cleared", JSON.stringify({ scope: 'batch', is_priority: !!isPriority })).run();
+
+      await log.info("priority_changed", { traceId: generateTraceId(), userEmail: actorEmail, scope: 'batch', isPriority: !!isPriority, orderNumber });
+      return NextResponse.json({ success: true });
+    } catch (e: unknown) { return sanitizeError(e, { user: userEmail, slug }); }
+  }
+
   if (slug?.[0] === 'update-notes') {
     try {
       const { order_number, notes } = await req.json();
@@ -709,7 +771,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'manual') {
     try {
       const body = await req.json();
-      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = body;
+      const { order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes, is_priority, priority_note } = body;
       
       await log.info("Manual order injection started", { user: userEmail, order_number, customer_name });
 
@@ -719,8 +781,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
       }
 
       const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
-      await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, status, print_name, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?)")
-        .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null).run();
+      const isPriority = is_priority ? 1 : 0;
+      await db.prepare("INSERT INTO orders (id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, status, print_name, notes, is_priority, priority_by, priority_at, priority_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?, ?, ?, ?, ?)")
+        .bind(crypto.randomUUID(), order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null, isPriority, isPriority ? userEmail : null, isPriority ? new Date().toISOString() : null, priority_note || null).run();
       
       await log.info("Manual order injection successful", { user: userEmail, order_number });
       return NextResponse.json({ success: true });
@@ -730,15 +793,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (slug?.[0] === 'update') {
     try {
       const body = await req.json();
-      const { id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes } = body;
+      const { id, order_number, customer_name, product_name, variant, image_url, image_url2, image_url3, image_url4, quantity, print_name, notes, is_priority, priority_note } = body;
       
       if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
       
       await log.info("Order update started", { user: userEmail, id, order_number });
 
       const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
-      await db.prepare("UPDATE orders SET order_number = ?, customer_name = ?, product_name = ?, variant = ?, image_url = ?, image_url2 = ?, image_url3 = ?, image_url4 = ?, quantity = ?, print_name = ?, notes = ? WHERE id = ?")
-        .bind(order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null, id).run();
+      const isPriority = is_priority ? 1 : 0;
+      const priorityBy = isPriority ? userEmail : null;
+      const priorityAt = isPriority ? new Date().toISOString() : null;
+      await db.prepare("UPDATE orders SET order_number = ?, customer_name = ?, product_name = ?, variant = ?, image_url = ?, image_url2 = ?, image_url3 = ?, image_url4 = ?, quantity = ?, print_name = ?, notes = ?, is_priority = ?, priority_by = ?, priority_at = ?, priority_note = ? WHERE id = ?")
+        .bind(order_number, customer_name, product_name, variant, image_url, image_url2 || null, image_url3 || null, image_url4 || null, qty, print_name || null, notes || null, isPriority, priorityBy, priorityAt, priority_note || null, id).run();
       
       await log.info("Order update successful", { user: userEmail, id, order_number });
       return NextResponse.json({ success: true });
@@ -791,6 +857,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
         await db.batch([
           db.prepare("DELETE FROM audit_logs WHERE order_id IN (SELECT id FROM orders WHERE order_number = ?)").bind(orderNumber),
           db.prepare("DELETE FROM shipments WHERE order_number = ?").bind(orderNumber),
+          db.prepare("DELETE FROM batch_priorities WHERE order_number = ?").bind(orderNumber),
           db.prepare("DELETE FROM orders WHERE order_number = ?").bind(orderNumber),
         ]);
         await db.prepare("PRAGMA foreign_keys = ON").run();

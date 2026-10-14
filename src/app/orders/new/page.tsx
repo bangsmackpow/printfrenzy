@@ -21,7 +21,9 @@ export default function NewOrderPage() {
     image_url4: '',
     quantity: 1,
     print_name: '',
-    notes: ''
+    notes: '',
+    is_priority: false,
+    priority_note: ''
   });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState<Record<number, boolean>>({});
@@ -170,6 +172,29 @@ export default function NewOrderPage() {
               className="w-full min-h-[3.5rem] bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
               placeholder="Internal notes..."
             />
+          </div>
+
+          <div className={`space-y-3 rounded-2xl border-2 p-5 transition-all ${formData.is_priority ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={formData.is_priority}
+                onChange={(e) => setFormData({ ...formData, is_priority: e.target.checked })}
+                className="h-5 w-5 rounded accent-amber-500"
+              />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 flex items-center gap-1.5">
+                <svg className={`h-4 w-4 ${formData.is_priority ? 'text-amber-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" strokeLinecap="round" strokeWidth={2.5} /></svg>
+                Priority Item
+              </span>
+            </label>
+            {formData.is_priority && (
+              <AutoGrowTextarea
+                value={formData.priority_note}
+                onChange={(e) => setFormData({ ...formData, priority_note: e.target.value })}
+                className="w-full min-h-[3rem] bg-white border border-amber-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-400 transition-all"
+                placeholder="Why is this item priority?"
+              />
+            )}
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-50">
