@@ -12,6 +12,7 @@ The goal of this application is to minimize the "clicks-to-print" ratio:
 - **CSV Import Review & Select**: Two side-by-side import modes — a quick blind upload, and a **Review & Select** flow that previews every line item with checkboxes, flags what's already in the queue, and imports only your selection as a single batch card.
 - **Auto-Image Uplifting**: Automatically transforms low-res Wix thumbnails into 1500px+ production-quality images via `wixUtils.ts`.
 - **Manual Orders**: Drag-and-drop design uploads directly to Cloudflare R2 for off-platform or custom jobs.
+- **Priority Tagging**: Flag a single line item or an entire batch as priority. Priority batches float to the top of each stage and priority items rise within their batch, so rush work is always in view.
 - **Accountability**: Real-time logging of exactly which staff member moved which design through the production pipeline.
 
 ### 🔔 Live Notifications
@@ -50,7 +51,7 @@ Protecting the production data and team access:
 
 ### 📅 Current Development Progress
 ✅ **Completed**:
-- **Database Schema**: Unified tables for `users`, `orders`, `audit_logs`, `shipments`, `notification_subscriptions`, and `notifications`. Orders support up to 4 images (`image_url` through `image_url4`).
+- **Database Schema**: Unified tables for `users`, `orders`, `audit_logs`, `shipments`, `batch_priorities`, `notification_subscriptions`, and `notifications`. Orders support up to 4 images (`image_url` through `image_url4`) plus per-item priority (`is_priority`, `priority_by`, `priority_at`, `priority_note`); batch-level priority lives in `batch_priorities` (keyed by `order_number`).
 - **Auth Engine**: Switched to `@auth/nextjs (v5)` to support Next.js 16 on the Edge.
 - **Production Queue**: Dashboard built with item grouping for multi-item Wix orders.
 - **Command Center**: Audit log with intelligence filters and production velocity stats.
@@ -85,6 +86,7 @@ Protecting the production data and team access:
 - **Auto-Growing Order Form Textareas**: Size/Variant, Personalization, and Production Notes fields on the Edit and New Order pages wrap and auto-resize so long values are fully viewable without sideways scrolling.
 - **P1 Security & Correctness Pass (Cloudflare-MCP audit)**: hardened the D1 rate limiter, chunked bulk/notification `IN()` queries under D1's bind-param cap, made System Clear an ordered FK-safe batch, added `getCurrentUser()` live-role revocation, added an atomic `shipment_locks` double-charge guard (migration `0003`), and made upload magic-byte validation fail-closed. See `STATUS.md` #33.
 - **Zoomable Item Detail View**: a circular explode button on every queue card (all stages) opens a read-only detail modal — zoomable/pannable artwork with a 4-image thumbnail strip on the left, full order record (customer, product, size, quantity, personalization, notes, stage, date) on the right. Artwork handling is null-safe (D1 returns `null` for empty image columns), so items without images open a clean "No artwork attached" panel. See `STATUS.md` #34.
+- **Priority Tagging (Item + Batch)**: mark a line item or an entire batch as priority. An amber flag badge marks it (hover shows who flagged it and when), priority batches float to the top of each stage while priority items rise within a batch/customer group, and each carries a dedicated priority note (never overwrites production notes). Toggled from the dashboard, the item detail modal, order details, and the edit/new order forms; every change is written to the audit log. Requires migration `0004_priority.sql`. See `STATUS.md` #35.
 
 ⏳ **In Progress / Next Phase**:
 - **Migrate off `@cloudflare/next-on-pages`** to OpenNext / vinext on Workers — the current builder is deprecated, peer-caps Next at ≤15.5.2, and cannot build patched `next`/`@auth/core` (see Known Constraints). This is the prerequisite for clearing the allowlisted criticals.
@@ -118,7 +120,7 @@ Add these to your Cloudflare Pages Dashboard:
 ---
 
 ### ⚠️ Known Constraints (Security Posture)
-- The app is deployed on Cloudflare **Pages** via `@cloudflare/next-on-pages`, which is **deprecated** and pins `next` to ≤15.5.2 (peer) / `@vercel/next@4.12.4`. As a result we are **pinned to `next@16.2.6` and `next-auth@5.0.0-beta.31`** — bumping either to a security-patched version **fails the Pages build** (verified). This leaves **12 Next + 4 Auth.js critical advisories open**, all enumerated and justified in [`.github/audit-allowlist.json`](./.github/audit-allowlist.json). The newest (GHSA-vcvr-r3jv-pc5j, a `next/og` `ImageResponse` RCE) is unreachable here — no `next/og` import, no OG-image routes — and is flagged for re-check if either is ever added.
+- The app is deployed on Cloudflare **Pages** via `@cloudflare/next-on-pages`, which is **deprecated** and pins `next` to ≤15.5.2 (peer) / `@vercel/next@4.12.4`. As a result we are **pinned to `next@16.2.6` and `next-auth@5.0.0-beta.31`** — bumping either to a security-patched version **fails the Pages build** (verified). This leaves **21 framework/Auth.js advisories open (17 Next + 4 Auth.js)**, all enumerated and justified in [`.github/audit-allowlist.json`](./.github/audit-allowlist.json). Two are unreachable by construction and worth calling out: GHSA-vcvr-r3jv-pc5j (a `next/og` `ImageResponse` RCE) needs no `next/og` import and no OG-image routes (neither exists), and the Image-Optimization SSRF/AVIF advisories are unreachable because every `<Image>` uses `unoptimized` (bypassing `/_next/image`) with a tight `remotePatterns` allowlist. The metadata-image and SSG/ISR cache-poisoning advisories are likewise unreachable (no OG routes; app is dynamic/edge, not SSG/ISR). All are flagged for re-check if the relevant feature is ever added.
 - The CI gate (`.github/audit-gate.mjs`) still **blocks on any *new* production critical** — only the documented pinned set is tolerated.
 - Application-level controls partially offset the auth advisories: `getCurrentUser()` live-role checks (revocation), per-route authorization rather than middleware-only, and fail-closed rate limiting.
 - **The fix** is migrating the deploy target off next-on-pages to **OpenNext or vinext on Workers**, then bumping to patched `next`/`@auth/core` and emptying the allowlist. Until then, treat the Next/Auth.js advisories as accepted, tracked risk.

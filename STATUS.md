@@ -6,8 +6,9 @@
 - **Queue Ordering**: Priority batches float to the top of each stage and priority items float to the top within a batch / customer group (stable sort, `created_at` preserved for ties). Dashboard `orderedGroups` + details-page customer groups.
 - **Dedicated Priority Note**: Never clobbers production notes. Editable in `ItemDetailModal`, `/orders/details` (per-item + batch), `/orders/[id]/edit`, and `/orders/new` via the reusable `src/components/PriorityControl.tsx`; dashboard cards get per-item toggles and the batch header gets a batch toggle.
 - **API & Data**: New `POST /api/orders/priority` (`scope: 'item' | 'batch'`; note preserved when omitted; sets `priority_by`/`priority_at` on set, nulls them on clear). `GET /api/orders` and `GET /api/orders/details` LEFT JOIN `batch_priorities` to return `batch_is_priority*`. `manual` + `update` accept `is_priority`/`priority_note`. Whole-batch delete purges the `batch_priorities` row (single-item delete does not). Writes `PRIORITY_CHANGE` to `audit_logs` (new amber badge + "Priority Changes" quick filter on `/admin/audit`).
-- **Migration**: `0004_priority.sql` (adds the four `orders` columns, creates `batch_priorities`, indexes `orders.is_priority`); also folded into canonical `schema.sql`. FTS unaffected.
-- Verified: `tsc --noEmit` clean, no new ESLint errors.
+- **Migration**: `0004_priority.sql` (adds the four `orders` columns, creates `batch_priorities`, indexes `orders.is_priority`); also folded into canonical `schema.sql`. FTS unaffected. Applied to remote D1 and verified (`EXPLAIN QUERY PLAN` uses `idx_orders_created_at` + the `batch_priorities` PK for the LEFT JOIN).
+- **CI allowlist expansion (same batch)**: the pre-push audit gate began failing on 5 newly-published Next advisories (all patched only in `next >=16.3.8`) that ride the critical `next` package. Added to `.github/audit-allowlist.json` with per-advisory reachability mitigations — allowlist now **21 (17 Next + 4 Auth.js)**. App stays pinned to `next@16.2.6` on next-on-pages (no dependency/build change); the gate passes. Startup production is unaffected.
+- Verified: `tsc --noEmit` clean, no new ESLint errors, `npm audit --omit=dev --json | node .github/audit-gate.mjs` passes.
 
 ---
 
